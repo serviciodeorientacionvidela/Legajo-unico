@@ -1,0 +1,155 @@
+// Legajo Único del Estudiante (LUE)
+// Datos personales de menores: Ley 25.326 (Protección de Datos Personales) y Ley 26.061 (Protección Integral NNyA).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  DIRECTIVO_SOE
+  PRECEPTOR
+  DOCENTE
+}
+
+enum EstadoMatricula {
+  REGULAR
+  PASE
+  EGRESADO
+}
+
+enum TipoIncidente {
+  LEVE
+  MODERADA
+  GRAVE
+  ACUERDO_PEDAGOGICO
+}
+
+enum AccionAuditoria {
+  VER_LEGAJO
+  VER_CUD_SOE
+  CARGAR_ACTA
+  IMPORTAR_GEI
+}
+
+model Usuario {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  nombre       String
+  passwordHash String
+  rol          Rol
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  incidentesCargados IncidenteConvivencia[]
+  intervencionesSoe  IntervencionSoe[]
+  auditLogs          AuditLog[]
+}
+
+model Estudiante {
+  id                   String    @id @default(cuid())
+  dni                  String    @unique
+  cuil                 String?
+  apellidos            String
+  nombres              String
+  fechaNacimiento      DateTime?
+  anio                 Int // 1 a 5 (validado en la capa de aplicación)
+  division             String
+  turno                String
+  promedioGeneral      Float     @default(0)
+  porcentajeAsistencia Float     @default(100)
+  puntosConvivencia    Int       @default(20)
+  tieneCud             Boolean   @default(false)
+  vencimientoCud       DateTime?
+  requierePpi          Boolean   @default(false)
+
+  // --- Datos sensibles: solo nivel 3 (DIRECTIVO_SOE) ---
+  diagnosticoReservado        String?
+  cudUrl                      String?
+  observacionesConfidenciales String?
+
+  // --- Google Drive ---
+  driveFolderId              String?
+  driveDocumentacionFolderId String?
+  driveConvivenciaFolderId   String?
+  driveConfidencialFolderId  String?
+
+  estadoMatricula EstadoMatricula @default(REGULAR)
+  updatedAt       DateTime        @updatedAt
+
+  calificaciones CalificacionMateria[]
+  incidentes     IncidenteConvivencia[]
+  intervenciones IntervencionSoe[]
+
+  @@index([anio, division])
+  @@index([apellidos])
+}
+
+model CalificacionMateria {
+  id                  String     @id @default(cuid())
+  estudianteId        String
+  estudiante          Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  materia             String
+  cicloLectivo        Int
+  primerCuatrimestre  Float?
+  segundoCuatrimestre Float?
+  notaFinal           Float?
+  previa              Boolean    @default(false)
+
+  @@unique([estudianteId, materia, cicloLectivo])
+}
+
+model IncidenteConvivencia {
+  id                String        @id @default(cuid())
+  estudianteId      String
+  estudiante        Estudiante    @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  autorId           String
+  autor             Usuario       @relation(fields: [autorId], references: [id])
+  fecha             DateTime
+  tipo              TipoIncidente
+  puntosDescontados Int
+  motivo            String
+  descargoAlumno    String?
+  medidaAdoptada    String?
+  notificadoFamilia Boolean       @default(false)
+  actaDriveUrl      String?
+  // Circuito de aprobación (matriz de permisos): el Preceptor carga, el Directivo aprueba/da de baja.
+  // Los puntos solo se descuentan del Estudiante cuando aprobado = true.
+  aprobado          Boolean       @default(false)
+  aprobadoPorId     String?
+  anulado           Boolean       @default(false)
+
+  @@index([estudianteId, fecha])
+}
+
+model IntervencionSoe {
+  id                  String     @id @default(cuid())
+  estudianteId        String
+  estudiante          Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  profesionalId       String
+  profesional         Usuario    @relation(fields: [profesionalId], references: [id])
+  fecha               DateTime
+  motivo              String
+  informeConfidencial String     @db.Text
+  acuerdosDocentes    String     @db.Text // visible para docentes: sin datos clínicos
+  archivoDriveUrl     String?
+
+  @@index([estudianteId, fecha])
+}
+
+model AuditLog {
+  id            String          @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario         @relation(fields: [usuarioId], references: [id])
+  estudianteDni String?
+  accion        AccionAuditoria
+  ipAddress     String?
+  createdAt     DateTime        @default(now())
+
+  @@index([estudianteDni, createdAt])
+  @@index([usuarioId, createdAt])
+}

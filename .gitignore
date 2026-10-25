@@ -1,0 +1,27 @@
+.aider*
+
+# dependencias
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# entorno (credenciales GEI, clave de Service Account, Neon)
+.env
+.env*.local
+!.env.example
+
+# reportes descargados del GEI (datos personales de menores)
+gei-downloads/
+
+# playwright
+playwright-report/
+test-results/
+
+# varios
+.DS_Store
+*.log
+.vercel
