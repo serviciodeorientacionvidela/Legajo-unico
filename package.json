@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
+    "usuario:crear": "tsx scripts/crear-usuario.ts",
     "gei:scrape": "tsx scripts/gei-scraper.ts"
   },
   "dependencies": {
