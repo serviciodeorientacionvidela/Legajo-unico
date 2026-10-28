@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, DNI_REGEX, jsonConSesion, manejarError, obtenerIp, requerirSesion } from "@/lib/api";
 import { registrarAuditoria } from "@/lib/audit";
-import { descuentoEfectivo, PUNTOS_INICIALES, validarPuntos } from "@/lib/convivencia";
+import { PUNTOS_INICIALES, validarPuntos } from "@/lib/convivencia";
 import { prisma } from "@/lib/prisma";
 import { exigirPermiso, tienePermiso } from "@/lib/rbac";
 import { TIPOS_INCIDENTE } from "@/lib/types";
@@ -40,9 +40,11 @@ const esquemaIncidente = z.object({
 });
 
 /**
- * POST /api/convivencia — Carga de un incidente.
- * - DIRECTIVO_SOE: el incidente queda aprobado y los puntos se descuentan en la misma transacción.
- * - PRECEPTOR: el incidente queda pendiente de aprobación (sin descuento hasta que Dirección apruebe).
+ * POST /api/convivencia — Carga de un incidente (registro del hecho, acta y medida).
+ * - DIRECTIVO_SOE: el incidente queda aprobado.
+ * - PRECEPTOR: el incidente queda pendiente de aprobación.
+ * Los puntos indicados son los que corresponde cargar en el GEI: el saldo oficial (Puntos ICE)
+ * se importa del GEI y el LUE no lo modifica.
  */
 export async function POST(req: Request) {
   try {
@@ -65,17 +67,8 @@ export async function POST(req: Request) {
       });
       if (!estudiante) throw new ApiError(404, "No existe un estudiante con ese DNI.");
 
-      const puntos = apruebaDirecto
-        ? descuentoEfectivo(estudiante.puntosConvivencia, datos.puntosDescontados)
-        : datos.puntosDescontados;
-
-      const actualizado = apruebaDirecto
-        ? await tx.estudiante.update({
-            where: { id: estudiante.id },
-            data: { puntosConvivencia: { decrement: puntos } },
-            select: { puntosConvivencia: true },
-          })
-        : estudiante;
+      const puntos = datos.puntosDescontados;
+      const actualizado = estudiante;
 
       const incidente = await tx.incidenteConvivencia.create({
         data: {
@@ -121,8 +114,9 @@ const esquemaResolucion = z.object({
 
 /**
  * PATCH /api/convivencia — Solo DIRECTIVO_SOE.
- * - APROBAR: aprueba un incidente pendiente y descuenta los puntos.
- * - ANULAR (baja): anula el incidente y, si ya había descontado puntos, los restituye.
+ * - APROBAR: aprueba un incidente pendiente.
+ * - ANULAR (baja): anula el incidente.
+ * Ninguna de las dos modifica el saldo de puntos (lo administra el GEI).
  */
 export async function PATCH(req: Request) {
   try {
@@ -140,29 +134,18 @@ export async function PATCH(req: Request) {
 
       const { estudiante } = incidente;
 
+      // El saldo de puntos no cambia: lo administra el GEI (Puntos ICE).
       if (accion === "APROBAR") {
         if (incidente.aprobado) throw new ApiError(409, "El incidente ya estaba aprobado.");
-        const puntos = descuentoEfectivo(estudiante.puntosConvivencia, incidente.puntosDescontados);
-        const actualizado = await tx.estudiante.update({
-          where: { id: estudiante.id },
-          data: { puntosConvivencia: { decrement: puntos } },
-          select: { puntosConvivencia: true },
-        });
         await tx.incidenteConvivencia.update({
           where: { id: incidente.id },
-          data: { aprobado: true, aprobadoPorId: usuario.id, puntosDescontados: puntos },
+          data: { aprobado: true, aprobadoPorId: usuario.id },
         });
-        return { dni: estudiante.dni, puntosConvivencia: actualizado.puntosConvivencia };
+        return { dni: estudiante.dni, puntosConvivencia: estudiante.puntosConvivencia };
       }
 
-      const restitucion = incidente.aprobado ? incidente.puntosDescontados : 0;
-      const actualizado = await tx.estudiante.update({
-        where: { id: estudiante.id },
-        data: { puntosConvivencia: Math.min(PUNTOS_INICIALES, estudiante.puntosConvivencia + restitucion) },
-        select: { puntosConvivencia: true },
-      });
       await tx.incidenteConvivencia.update({ where: { id: incidente.id }, data: { anulado: true } });
-      return { dni: estudiante.dni, puntosConvivencia: actualizado.puntosConvivencia };
+      return { dni: estudiante.dni, puntosConvivencia: estudiante.puntosConvivencia };
     }, OPCIONES_TRANSACCION);
 
     await registrarAuditoria(usuario.id, resultado.dni, "CARGAR_ACTA", obtenerIp(req));

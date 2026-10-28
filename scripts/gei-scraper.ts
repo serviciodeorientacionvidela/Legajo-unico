@@ -18,6 +18,8 @@
  *   npm run gei:scrape -- --sin-drive      # importa sin sincronizar Google Drive
  *   npm run gei:scrape -- --solo-fichas    # solo trayectoria y alertas tempranas (sin planillas)
  *   npm run gei:scrape -- --sin-fichas     # omite las fichas (más rápido)
+ *   npm run gei:scrape -- --solo-historial # solo notas de ciclos anteriores (GEI_CICLOS_ANTERIORES, por defecto 2)
+ *   npm run gei:scrape -- --sin-historial  # omite las notas de ciclos anteriores
  *
  * Variables de entorno (ver .env.example): GEI_USER, GEI_PASS, GEI_SYNC_USER_EMAIL y, opcionalmente,
  * GEI_LOGIN_URL, GEI_BASE_URL, GEI_ESCUELA_ID, GEI_ANIOS, GEI_CICLO.
@@ -29,7 +31,13 @@ import { config as cargarEnv } from "dotenv";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
-import { ROTULOS_TABLA_ALERTAS, ROTULOS_TABLA_TRAYECTORIA, type FichaGei } from "../src/services/geiFichas";
+import {
+  MARCA_MES_CERRADO,
+  ROTULOS_TABLA_ALERTAS,
+  ROTULOS_TABLA_TRAYECTORIA,
+  type FichaGei,
+  type PadGei,
+} from "../src/services/geiFichas";
 
 cargarEnv({ path: ".env.local" });
 cargarEnv();
@@ -40,12 +48,16 @@ const SOLO_DESCARGAR = argumentos.has("--solo-descargar");
 const SIN_DRIVE = argumentos.has("--sin-drive");
 const SOLO_FICHAS = argumentos.has("--solo-fichas");
 const SIN_FICHAS = argumentos.has("--sin-fichas");
+const SOLO_HISTORIAL = argumentos.has("--solo-historial");
+const SIN_HISTORIAL = argumentos.has("--sin-historial");
 
 const URL_INGRESO = process.env.GEI_LOGIN_URL ?? "https://intranet.mendoza.edu.ar/usuarios/auth/login";
 const URL_GEI = (process.env.GEI_BASE_URL ?? "https://dti.mendoza.edu.ar/gem/").replace(/\/?$/, "/");
 const ESCUELA_ID = process.env.GEI_ESCUELA_ID ?? "1000";
 const CICLO = Number(process.env.GEI_CICLO ?? new Date().getFullYear());
 const ANIOS = (process.env.GEI_ANIOS ?? "1,2,3,4,5").split(",").map((a) => Number(a.trim())).filter(Boolean);
+/** Ciclos anteriores de los que se importan notas (solo de esta escuela: el GEI no muestra otras). */
+const CICLOS_ANTERIORES = Number(process.env.GEI_CICLOS_ANTERIORES ?? 2);
 
 const CARPETA_DESCARGAS = path.resolve(process.cwd(), "gei-downloads", new Date().toISOString().slice(0, 10));
 const TIMEOUT_MS = 90_000;
@@ -144,8 +156,8 @@ async function descargar(contexto: BrowserContext, ruta: string, nombre: string)
   return null;
 }
 
-async function listarDivisiones(page: Page): Promise<DivisionGei[]> {
-  await page.goto(`${URL_GEI}escuela/alumnos_inasistencias/${ESCUELA_ID}`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
+async function listarDivisiones(page: Page, ciclo = CICLO): Promise<DivisionGei[]> {
+  await page.goto(`${URL_GEI}escuela/alumnos_inasistencias/${ESCUELA_ID}/${ciclo}`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   await page.locator('a[href*="division_inasistencia/listar/"]').first().waitFor({ timeout: TIMEOUT_MS });
   const filas = await page.$$eval("table tbody tr", (trs) =>
     trs.map((tr) => {
@@ -168,11 +180,29 @@ async function listarDivisiones(page: Page): Promise<DivisionGei[]> {
     .filter((f) => ANIOS.includes(f.anio));
 }
 
-async function listarCursadas(page: Page, divisionId: string): Promise<string[]> {
-  await page.goto(`${URL_GEI}cursada/listar/${divisionId}`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
+async function listarCursadas(page: Page, divisionId: string, ciclo = CICLO): Promise<string[]> {
+  await page.goto(`${URL_GEI}cursada/listar/${divisionId}/${ciclo}`, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   await page.locator('a[href*="cursada/escritorio/"]').first().waitFor({ timeout: TIMEOUT_MS });
   const hrefs = await page.$$eval('a[href*="cursada/escritorio/"]', (as) => as.map((a) => a.getAttribute("href") ?? ""));
   return [...new Set(hrefs.map((h) => /cursada\/escritorio\/(\d+)/.exec(h)?.[1]).filter((id): id is string => Boolean(id)))];
+}
+
+/** Planillas de notas de todas las divisiones de un ciclo ya cerrado. */
+async function descargarNotasCiclo(page: Page, contexto: BrowserContext, ciclo: number): Promise<ArchivoDescargado[]> {
+  const divisiones = await listarDivisiones(page, ciclo);
+  const archivos: ArchivoDescargado[] = [];
+  for (const d of divisiones) {
+    for (const cursadaId of await listarCursadas(page, d.divisionId, ciclo)) {
+      const archivo = await descargar(
+        contexto,
+        `cursada/excel_resumen_evaluaciones_generico/${cursadaId}/${ciclo}`,
+        `notas${ciclo}_${slug(d.curso)}_${cursadaId}`,
+      );
+      if (archivo) archivos.push(archivo);
+    }
+  }
+  console.log(`✓ Ciclo ${ciclo}: ${archivos.length} planillas de notas de ${divisiones.length} divisiones`);
+  return archivos;
 }
 
 function slug(texto: string): string {
@@ -185,6 +215,7 @@ async function importar(
   evaluaciones: ArchivoDescargado[],
   fichas: FichaGei[],
   turnos: { curso: string; turno: string }[],
+  historial: { ciclo: number; evaluaciones: ArchivoDescargado[] }[],
 ) {
   // Import dinámico: dotenv ya cargó DATABASE_URL antes de instanciar Prisma.
   const { prisma } = await import("../src/lib/prisma");
@@ -203,9 +234,18 @@ async function importar(
     // Después de la matrícula, que no trae el turno.
     if (turnos.length > 0) console.log(`📊 Turnos: ${await actualizarTurnosGei(turnos)} alumnos actualizados`);
     if (fichas.length > 0) {
-      const f = await importarFichasGei(fichas, { usuarioId: responsable.id, ipAddress: "gei-scraper" });
+      const f = await importarFichasGei(fichas, { usuarioId: responsable.id, cicloLectivo: CICLO, ipAddress: "gei-scraper" });
       console.log(`📊 Fichas: ${f.alumnosActualizados} alumnos · ${f.ciclosTrayectoria} ciclos de trayectoria · ${f.alertasTempranas} alertas tempranas`);
+      console.log(`   PAD: ${f.faltasIce} faltas ICE · ${f.mesesAsistencia} meses de asistencia`);
       if (f.sinEstudiante > 0) console.warn(`   ⚠ ${f.sinEstudiante} fichas de alumnos que no están en la base`);
+    }
+    for (const { ciclo, evaluaciones: notasCiclo } of historial) {
+      const h = await importarPlanillasGei(
+        { asistencias: [], evaluaciones: notasCiclo },
+        { usuarioId: responsable.id, cicloLectivo: ciclo, cicloAnterior: true, ipAddress: "gei-scraper" },
+      );
+      console.log(`📊 Notas ${ciclo}: ${h.calificacionesActualizadas} materias-alumno (${h.sinCruzar.length} filas de alumnos que ya no están)`);
+      h.errores.forEach((e) => console.warn(`   ✗ ${e}`));
     }
   } finally {
     await prisma.$disconnect();
@@ -292,7 +332,53 @@ const SCRIPT_TABLAS_FICHA = `(() => {
   };
 })()`;
 
-/** Lee la trayectoria y las alertas tempranas de la ficha de cada alumno (alumno/ver). */
+/** Escritorio G.E.I. PAD (pad/escritorio/alumno): Puntos ICE y resumen mensual de asistencia. */
+const SCRIPT_PAD = `(() => {
+  const limpiar = (s) => (s ?? "").replace(/\\s+/g, " ").trim();
+  const caja = (titulo) =>
+    [...document.querySelectorAll(".box")].find((b) => limpiar(b.querySelector(".box-title")?.textContent).startsWith(titulo));
+  const filas = (tabla, minimo) =>
+    tabla
+      ? [...tabla.rows]
+          .map((tr) => [...tr.cells].map((td, i) => limpiar(td.textContent) + (i === 0 && tr.querySelector(".fa-lock") ? "${MARCA_MES_CERRADO}" : "")))
+          .filter((c) => c.length >= minimo)
+      : [];
+  const ice = caja("Puntos ICE");
+  const asistencia = caja("Asistencia");
+  if (!ice && !asistencia) return null;
+  const tablasIce = ice ? [...ice.querySelectorAll("table")] : [];
+  return {
+    totalIce: Number(/Total:\\s*(\\d+)/.exec(limpiar(ice?.textContent))?.[1] ?? NaN) || null,
+    faltas: filas(tablasIce.find((t) => t.id !== "table_baja"), 3).filter((c) => /\\d/.test(c[1] ?? "")),
+    faltasBaja: filas(ice?.querySelector("#table_baja"), 4).filter((c) => /\\d/.test(c[1] ?? "")),
+    asistencia: (asistencia ? [...asistencia.querySelectorAll("table")] : [])
+      .filter((t) => /Período|Periodo|Intensificación/.test(limpiar(t.rows[0]?.textContent)))
+      .map((t) => ({ periodo: limpiar(t.rows[0].textContent), filas: filas(t, 6) })),
+  };
+})()`;
+
+/**
+ * Carga el HTML de una página del GEI en la página auxiliar de parseo. Se quitan scripts e iframes
+ * (no hacen falta y pueden trabar la carga) y se reintenta una vez si el navegador no responde.
+ */
+async function leerHtml(contexto: BrowserContext, parseo: Page, ruta: string): Promise<void> {
+  const html = await (await contexto.request.get(`${URL_GEI}${ruta}`, { timeout: TIMEOUT_MS })).text();
+  const limpio = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+  for (let intento = 1; ; intento++) {
+    try {
+      await parseo.setContent(limpio, { waitUntil: "commit", timeout: 20_000 });
+      return;
+    } catch (error) {
+      if (intento >= 2) throw error;
+      await esperar(PAUSA_ENTRE_DESCARGAS_MS * 5);
+    }
+  }
+}
+
+/**
+ * Lee de cada alumno la ficha (alumno/ver: trayectoria y alertas tempranas) y el escritorio
+ * G.E.I. PAD (Puntos ICE y asistencia mensual).
+ */
 async function leerFichas(contexto: BrowserContext): Promise<FichaGei[]> {
   const alumnos = await listarAlumnosGei(contexto);
   console.log(`→ ${alumnos.length} fichas de alumnos para leer`);
@@ -302,20 +388,33 @@ async function leerFichas(contexto: BrowserContext): Promise<FichaGei[]> {
   const fichas: FichaGei[] = [];
   try {
     for (const [i, { dni, alumnoId }] of alumnos.entries()) {
-      const html = await (await contexto.request.get(`${URL_GEI}alumno/ver/${alumnoId}`, { timeout: TIMEOUT_MS })).text();
-      await parseo.setContent(html.replace(/<script[\s\S]*?<\/script>/gi, ""), { waitUntil: "domcontentloaded" });
-      const tablas = (await parseo.evaluate(SCRIPT_TABLAS_FICHA)) as {
-        trayectoria: string[][] | null;
-        alertas: string[][] | null;
-        pideLogin: boolean;
-      };
-      if (tablas.trayectoria === null) {
-        if (tablas.pideLogin) throw new Error("La sesión del GEI venció mientras se leían las fichas.");
-        console.warn(`  ⚠ Ficha ${alumnoId}: no se encontró la tabla de trayectoria; se omite.`);
-        omitidos.push(`ficha_${alumnoId}`);
-        continue;
+      try {
+        await leerHtml(contexto, parseo, `alumno/ver/${alumnoId}`);
+        const tablas = (await parseo.evaluate(SCRIPT_TABLAS_FICHA)) as {
+          trayectoria: string[][] | null;
+          alertas: string[][] | null;
+          pideLogin: boolean;
+        };
+        if (tablas.trayectoria === null) {
+          if (tablas.pideLogin) throw new Error("La sesión del GEI venció mientras se leían las fichas.");
+          console.warn(`  ⚠ Ficha ${alumnoId}: no se encontró la tabla de trayectoria; se omite.`);
+          omitidos.push(`ficha_${alumnoId}`);
+          continue;
+        }
+        await esperar(PAUSA_ENTRE_DESCARGAS_MS);
+        await leerHtml(contexto, parseo, `pad/escritorio/alumno/${alumnoId}`);
+        const pad = (await parseo.evaluate(SCRIPT_PAD)) as PadGei | null;
+        if (!pad) {
+          console.warn(`  ⚠ PAD ${alumnoId}: no se encontraron Puntos ICE ni asistencia.`);
+          omitidos.push(`pad_${alumnoId}`);
+        }
+        fichas.push({ dni, trayectoria: tablas.trayectoria, alertas: tablas.alertas ?? [], pad });
+      } catch (error) {
+        // La sesión vencida aborta todo; cualquier otra falla de un alumno solo lo omite.
+        if ((error as Error).message.includes("sesión del GEI venció")) throw error;
+        console.warn(`  ⚠ Alumno ${alumnoId}: ${(error as Error).message.split("\n")[0]}; se omite.`);
+        omitidos.push(`alumno_${alumnoId}`);
       }
-      fichas.push({ dni, trayectoria: tablas.trayectoria, alertas: tablas.alertas ?? [] });
       if ((i + 1) % 50 === 0) console.log(`  … ${i + 1}/${alumnos.length} fichas`);
       await esperar(PAUSA_ENTRE_DESCARGAS_MS);
     }
@@ -338,12 +437,13 @@ async function main(): Promise<void> {
   const evaluaciones: ArchivoDescargado[] = [];
   let fichas: FichaGei[] = [];
   let turnos: { curso: string; turno: string }[] = [];
+  const historial: { ciclo: number; evaluaciones: ArchivoDescargado[] }[] = [];
 
   try {
     await iniciarSesion(page);
     page = await entrarAlGei(contexto, page);
 
-    if (!SOLO_FICHAS) {
+    if (!SOLO_FICHAS && !SOLO_HISTORIAL) {
       matricula = await descargar(contexto, `alumno/excel_alumnos/${ESCUELA_ID}/${CICLO}`, "matricula");
       if (!matricula) throw new Error("No se pudo descargar la matrícula.");
       console.log("✓ Matrícula descargada");
@@ -365,7 +465,12 @@ async function main(): Promise<void> {
       }
     }
     turnos = await listarTurnos(contexto);
-    if (!SIN_FICHAS) fichas = await leerFichas(contexto);
+    if (!SIN_FICHAS && !SOLO_HISTORIAL) fichas = await leerFichas(contexto);
+    if (!SIN_HISTORIAL && !SOLO_FICHAS) {
+      for (let ciclo = CICLO - 1; ciclo >= CICLO - CICLOS_ANTERIORES; ciclo--) {
+        historial.push({ ciclo, evaluaciones: await descargarNotasCiclo(page, contexto, ciclo) });
+      }
+    }
   } catch (error) {
     const captura = path.join(CARPETA_DESCARGAS, `error-${Date.now()}.png`);
     await page.screenshot({ path: captura, fullPage: true }).catch(() => undefined);
@@ -383,7 +488,7 @@ async function main(): Promise<void> {
     console.log("Modo --solo-descargar: no se importaron los archivos.");
     return;
   }
-  await importar(matricula, asistencias, evaluaciones, fichas, turnos);
+  await importar(matricula, asistencias, evaluaciones, fichas, turnos, historial);
   console.log("\n✓ Sincronización GEI finalizada.");
 }
 

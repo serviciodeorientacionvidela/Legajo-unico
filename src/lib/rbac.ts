@@ -193,9 +193,34 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
             .sort((a, b) => new Date(b.fecha ?? 0).getTime() - new Date(a.fecha ?? 0).getTime()),
         }
       : null,
+    asistenciaMensual: [...legajo.asistencias]
+      .sort((a, b) => b.cicloLectivo - a.cicloLectivo || a.orden - b.orden)
+      .map((m) => ({
+        id: m.id,
+        cicloLectivo: m.cicloLectivo,
+        periodo: m.periodo,
+        mes: m.mes,
+        justificadas: m.justificadas,
+        injustificadas: m.injustificadas,
+        totalInasistencias: m.totalInasistencias,
+        diasAsistidos: m.diasAsistidos,
+        porcentaje: m.porcentaje,
+        cerrado: m.cerrado,
+      })),
     convivencia: verConvivencia
       ? {
           puntos: legajo.puntosConvivencia,
+          faltasIce: [...legajo.faltasIce]
+            .sort((a, b) => new Date(b.fecha ?? 0).getTime() - new Date(a.fecha ?? 0).getTime())
+            .map((f) => ({
+              id: f.id,
+              cicloLectivo: f.cicloLectivo,
+              fecha: isoONull(f.fecha),
+              puntos: f.puntos,
+              tipo: f.tipo,
+              dadaDeBaja: f.dadaDeBaja,
+              fechaBaja: isoONull(f.fechaBaja),
+            })),
           incidentes: incidentesOrdenados.map((i) => ({
             id: i.id,
             fecha: iso(i.fecha),

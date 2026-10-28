@@ -282,8 +282,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     setAviso({
       tono: "ok",
       texto: r.aprobado
-        ? `Incidente registrado: −${r.puntosDescontados} pts. Saldo actual: ${r.puntosConvivencia} pts.`
-        : "Incidente enviado a Dirección. Los puntos se descontarán cuando sea aprobado.",
+        ? `Incidente registrado. Recuerde cargar los −${r.puntosDescontados} pts en Puntos ICE del GEI.`
+        : "Incidente enviado a Dirección para su aprobación.",
     });
     await cargarLegajo(datos.dni, true);
     refrescar();
@@ -296,7 +296,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       const r = await fuente.resolverIncidente(incidenteId, accion);
       setAviso({
         tono: "ok",
-        texto: `${accion === "APROBAR" ? "Incidente aprobado" : "Incidente dado de baja"}. Saldo actual: ${r.puntosConvivencia} pts.`,
+        texto: `${accion === "APROBAR" ? "Incidente aprobado" : "Incidente dado de baja"}. Saldo ICE (GEI): ${r.puntosConvivencia} pts.`,
       });
       await cargarLegajo(dniAbierto, true);
       refrescar();

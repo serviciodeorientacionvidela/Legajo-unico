@@ -95,6 +95,8 @@ model Estudiante {
   intervenciones IntervencionSoe[]
   trayectoria    TrayectoriaEscolar[]
   alertas        AlertaTemprana[]
+  faltasIce      FaltaIce[]
+  asistencias    AsistenciaMensual[]
 
   @@index([anio, division])
   @@index([apellidos])
@@ -148,6 +150,46 @@ model AlertaTemprana {
   observaciones    String?
 
   @@index([estudianteId, fecha])
+}
+
+/**
+ * Faltas del régimen de convivencia (Puntos ICE) cargadas en el GEI. El GEI es la fuente oficial:
+ * Estudiante.puntosConvivencia toma el total del GEI en cada sincronización.
+ */
+model FaltaIce {
+  id           String     @id @default(cuid())
+  estudianteId String
+  estudiante   Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  cicloLectivo Int
+  fecha        DateTime?
+  puntos       Int
+  /// Leve, Moderada, Grave
+  tipo         String
+  dadaDeBaja   Boolean    @default(false)
+  fechaBaja    DateTime?
+
+  @@index([estudianteId, cicloLectivo])
+}
+
+/** Resumen mensual de asistencia del GEI PAD (inasistencias en días, admite medias faltas). */
+model AsistenciaMensual {
+  id                 String     @id @default(cuid())
+  estudianteId       String
+  estudiante         Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  cicloLectivo       Int
+  /// Primer Período, Segundo Período, Intensificación
+  periodo            String
+  /// Orden del mes dentro del ciclo (para graficar en secuencia)
+  orden              Int
+  mes                String
+  justificadas       Float?
+  injustificadas     Float?
+  totalInasistencias Float?
+  diasAsistidos      Float?
+  porcentaje         Float?
+  cerrado            Boolean    @default(false)
+
+  @@index([estudianteId, cicloLectivo])
 }
 
 model IncidenteConvivencia {

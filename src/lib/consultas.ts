@@ -15,6 +15,8 @@ export const INCLUDE_LEGAJO = {
   intervenciones: { include: { profesional: { select: { nombre: true } } } },
   trayectoria: true,
   alertas: true,
+  faltasIce: true,
+  asistencias: true,
 } satisfies Prisma.EstudianteInclude;
 
 export function construirFiltroEstudiantes(filtros: FiltrosEstudiantes): Prisma.EstudianteWhereInput {

@@ -12,10 +12,12 @@
  * - Alumna con pase a otra escuela
  */
 
-import { PUNTOS_INICIALES } from "./convivencia";
+import { PUNTOS_INICIALES, REGLAS_INCIDENTE } from "./convivencia";
 import type {
   AlertaTempranaFuente,
+  AsistenciaMensualFuente,
   CalificacionFuente,
+  FaltaIceFuente,
   EstadoMatricula,
   IncidenteFuente,
   IntervencionFuente,
@@ -298,6 +300,54 @@ function generarAlertas(spec: SpecAlumno): AlertaTempranaFuente[] {
   ];
 }
 
+/** Las faltas ICE del GEI reflejan los incidentes aprobados de la demo. */
+function generarFaltasIce(incidentes: IncidenteFuente[]): FaltaIceFuente[] {
+  return incidentes
+    .filter((i) => i.aprobado && i.puntosDescontados > 0)
+    .map((i) => ({
+      id: `${i.id}-ice`,
+      cicloLectivo: CICLO_DEMO,
+      fecha: i.fecha,
+      puntos: i.puntosDescontados,
+      tipo: REGLAS_INCIDENTE[i.tipo].etiqueta.replace("Falta ", "").replace(/^./, (c) => c.toUpperCase()),
+      dadaDeBaja: i.anulado,
+      fechaBaja: i.anulado ? i.fecha : null,
+    }));
+}
+
+const MESES_DEMO: [string, string][] = [
+  ["Primer Período", "Marzo"],
+  ["Primer Período", "Abril"],
+  ["Primer Período", "Mayo"],
+  ["Primer Período", "Junio"],
+  ["Primer Período", "Julio"],
+  ["Segundo Período", "Agosto"],
+  ["Segundo Período", "Septiembre"],
+  ["Segundo Período", "Octubre"],
+];
+
+/** Meses con un porcentaje que oscila alrededor de la asistencia anual del alumno. */
+function generarAsistenciaMensual(spec: SpecAlumno): AsistenciaMensualFuente[] {
+  return MESES_DEMO.map(([periodo, mes], orden) => {
+    const porcentaje = Math.max(0, Math.min(100, Math.round(spec.asistencia + ((orden * 7) % 9) - 4)));
+    const habiles = 20;
+    const inasistencias = Math.round(((100 - porcentaje) / 100) * habiles * 2) / 2;
+    return {
+      id: `${spec.dni}-asis-${orden}`,
+      cicloLectivo: CICLO_DEMO,
+      periodo,
+      orden,
+      mes,
+      justificadas: Math.floor(inasistencias / 2),
+      injustificadas: inasistencias - Math.floor(inasistencias / 2),
+      totalInasistencias: inasistencias,
+      diasAsistidos: habiles - inasistencias,
+      porcentaje,
+      cerrado: orden < MESES_DEMO.length - 1,
+    };
+  });
+}
+
 function construirLegajo(spec: SpecAlumno): LegajoFuente {
   const calificaciones = generarCalificaciones(spec);
   const incidentes = generarIncidentes(spec);
@@ -347,6 +397,8 @@ function construirLegajo(spec: SpecAlumno): LegajoFuente {
     intervenciones: generarIntervenciones(spec),
     trayectoria: generarTrayectoria(spec),
     alertas: generarAlertas(spec),
+    faltasIce: generarFaltasIce(incidentes),
+    asistencias: generarAsistenciaMensual(spec),
   };
 }
 

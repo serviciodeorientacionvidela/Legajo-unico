@@ -4,12 +4,47 @@
  * este módulo (puro, sin dependencias de servidor) las convierte en registros tipados.
  */
 
-/** Celdas de texto de una ficha, ya extraídas del HTML. */
+/** Celdas de texto de una ficha (alumno/ver) y de su escritorio G.E.I. PAD, ya extraídas del HTML. */
 export interface FichaGei {
   dni: string;
   trayectoria: string[][];
   alertas: string[][];
+  /** null si no se pudo leer el escritorio PAD: no se toca lo ya importado. */
+  pad: PadGei | null;
 }
+
+export interface PadGei {
+  /** "Total: 25" del bloque Puntos ICE. */
+  totalIce: number | null;
+  /** Puntos cargados: Fecha | Puntos | Tipo de falta. */
+  faltas: string[][];
+  /** Puntos dados de baja: Fecha | Puntos | Tipo de falta | Fecha baja. */
+  faltasBaja: string[][];
+  /** Una tabla por período: Mes | J | I | Total del mes | Asistencia | % (el mes cerrado termina en "🔒"). */
+  asistencia: { periodo: string; filas: string[][] }[];
+}
+
+export interface FaltaIceGei {
+  fecha: Date | null;
+  puntos: number;
+  tipo: string;
+  dadaDeBaja: boolean;
+  fechaBaja: Date | null;
+}
+
+export interface AsistenciaMensualGei {
+  periodo: string;
+  orden: number;
+  mes: string;
+  justificadas: number | null;
+  injustificadas: number | null;
+  totalInasistencias: number | null;
+  diasAsistidos: number | null;
+  porcentaje: number | null;
+  cerrado: boolean;
+}
+
+export const MARCA_MES_CERRADO = "🔒";
 
 export interface TrayectoriaGei {
   cicloLectivo: number;
@@ -75,6 +110,54 @@ export function parsearTrayectoria(filas: string[][]): TrayectoriaGei[] {
       },
     ];
   });
+}
+
+function numeroGei(valor: string | undefined): number | null {
+  const t = (valor ?? "").replace("%", "").trim();
+  if (!/^-?\d+(?:[.,]\d+)?$/.test(t)) return null;
+  return Number(t.replace(",", "."));
+}
+
+/** Faltas vigentes y dadas de baja del bloque Puntos ICE. */
+export function parsearFaltasIce(pad: PadGei): FaltaIceGei[] {
+  const vigentes = pad.faltas.flatMap((c) => {
+    const puntos = numeroGei(c[1]);
+    return puntos === null ? [] : [{ fecha: parsearFechaCorta(c[0]), puntos, tipo: c[2]?.trim() || "—", dadaDeBaja: false, fechaBaja: null }];
+  });
+  const bajas = pad.faltasBaja.flatMap((c) => {
+    const puntos = numeroGei(c[1]);
+    return puntos === null
+      ? []
+      : [{ fecha: parsearFechaCorta(c[0]), puntos, tipo: c[2]?.trim() || "—", dadaDeBaja: true, fechaBaja: parsearFechaCorta(c[3]) }];
+  });
+  return [...vigentes, ...bajas];
+}
+
+/** Meses con datos de los cuadros de asistencia del PAD, en orden de aparición. */
+export function parsearAsistenciaMensual(pad: PadGei): AsistenciaMensualGei[] {
+  let orden = 0;
+  return pad.asistencia.flatMap(({ periodo, filas }) =>
+    filas.flatMap((c) => {
+      const cerrado = (c[0] ?? "").includes(MARCA_MES_CERRADO);
+      const mes = (c[0] ?? "").replace(MARCA_MES_CERRADO, "").trim();
+      const valores = [c[1], c[2], c[3], c[4], c[5]].map(numeroGei);
+      if (!mes || valores.every((v) => v === null)) return [];
+      const [justificadas, injustificadas, totalInasistencias, diasAsistidos, porcentaje] = valores;
+      return [
+        {
+          periodo: periodo.replace(/\s*-\s*\d{2}\/.*$/, "").trim(),
+          orden: orden++,
+          mes,
+          justificadas: justificadas ?? null,
+          injustificadas: injustificadas ?? null,
+          totalInasistencias: totalInasistencias ?? null,
+          diasAsistidos: diasAsistidos ?? null,
+          porcentaje: porcentaje ?? null,
+          cerrado,
+        },
+      ];
+    }),
+  );
 }
 
 /** Columnas: Fecha | Escuela | Causas | Plan de intervención | Observaciones. */

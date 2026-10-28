@@ -4,6 +4,7 @@ import {
   Accessibility,
   BookOpen,
   Braces,
+  CalendarCheck,
   Check,
   FileText,
   FolderOpen,
@@ -24,6 +25,7 @@ import { rutaCarpetaEstudiante, SUBCARPETAS } from "@/lib/driveNombres";
 import { diasHasta, edad, etiquetaCurso, formatearFecha, formatearNota } from "@/lib/formato";
 import { tienePermiso } from "@/lib/rbac";
 import { ROL_ETIQUETA, type IncidenteVisible, type LegajoVisible, type TipoIncidente } from "@/lib/types";
+import { GraficoAsistenciaMensual, GraficoMaterias, GraficoPromediosPorCiclo, IndicadoresLegajo } from "./LegajoGraficos";
 import { Bloqueado, Insignia, MensajeError, Seccion } from "./ui";
 
 interface Props {
@@ -175,6 +177,11 @@ export default function LegajoDetalle({
   onResolverIncidente,
 }: Props) {
   const [verPayload, setVerPayload] = useState(false);
+  const [cicloNotas, setCicloNotas] = useState<number | null>(null);
+  const ciclosNotas = [...new Set((legajo?.calificaciones ?? []).map((c) => c.cicloLectivo))].sort((a, b) => b - a);
+  // Por defecto (o si el legajo cambió y el ciclo elegido no existe) se muestra el ciclo más reciente.
+  const cicloVisible = cicloNotas !== null && ciclosNotas.includes(cicloNotas) ? cicloNotas : (ciclosNotas[0] ?? null);
+  const notasVisibles = (legajo?.calificaciones ?? []).filter((c) => c.cicloLectivo === cicloVisible);
 
   useEffect(() => {
     if (!abierto) return;
@@ -196,7 +203,7 @@ export default function LegajoDetalle({
         role="dialog"
         aria-modal="true"
         aria-label="Legajo Único del Estudiante"
-        className="flex h-full w-full max-w-3xl flex-col bg-slate-50 shadow-2xl"
+        className="flex h-full w-full max-w-5xl flex-col bg-slate-50 shadow-2xl"
         onClick={(ev) => ev.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
@@ -265,6 +272,8 @@ export default function LegajoDetalle({
                 </div>
               )}
 
+              <IndicadoresLegajo legajo={legajo} />
+
               {(e.tieneCud || e.requierePpi) && (
                 <Seccion titulo="Alerta pedagógica" icono={<Accessibility className="h-4 w-4 text-violet-600" aria-hidden />}>
                   <div className="flex flex-wrap gap-2">
@@ -326,47 +335,175 @@ export default function LegajoDetalle({
                 </Seccion>
               )}
 
-              <Seccion titulo="Datos biográficos" icono={<User className="h-4 w-4 text-slate-500" aria-hidden />}>
-                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Dato etiqueta="DNI" valor={<span className="tabular-nums">{e.dni}</span>} />
-                  <Dato etiqueta="CUIL" valor={<span className="tabular-nums">{e.cuil ?? "—"}</span>} />
-                  <Dato
-                    etiqueta="Nacimiento"
-                    valor={`${formatearFecha(e.fechaNacimiento)}${edad(e.fechaNacimiento) !== null ? ` (${edad(e.fechaNacimiento)} años)` : ""}`}
-                  />
-                  <Dato etiqueta="Género" valor={e.genero ?? "—"} />
-                  <Dato etiqueta="Curso" valor={`${etiquetaCurso(e.anio, e.division)} · ${e.turno}`} />
-                  <Dato etiqueta="Promedio general" valor={formatearNota(e.promedioGeneral)} />
-                  <Dato etiqueta="Asistencia" valor={`${e.porcentajeAsistencia.toLocaleString("es-AR")}%`} />
-                  <Dato etiqueta="Última actualización" valor={formatearFecha(e.updatedAt)} />
-                </dl>
+              <Seccion
+                titulo="Rendimiento académico"
+                icono={<BookOpen className="h-4 w-4 text-slate-500" aria-hidden />}
+                accion={
+                  ciclosNotas.length > 1 ? (
+                    <div className="flex gap-1" role="group" aria-label="Ciclo lectivo">
+                      {ciclosNotas.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setCicloNotas(c)}
+                          aria-pressed={c === cicloVisible}
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums ring-1 ring-inset ${
+                            c === cicloVisible
+                              ? "bg-institucional-600 text-white ring-institucional-600"
+                              : "text-slate-600 ring-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  ) : undefined
+                }
+              >
+                {legajo.calificaciones.length === 0 ? (
+                  <p className="text-sm text-slate-500">Sin calificaciones importadas desde el GEI.</p>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <div>
+                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Nota vigente por materia · {cicloVisible}
+                        </h4>
+                        <GraficoMaterias calificaciones={notasVisibles} />
+                      </div>
+                      {ciclosNotas.length > 1 && (
+                        <div>
+                          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Promedio por ciclo</h4>
+                          <GraficoPromediosPorCiclo calificaciones={legajo.calificaciones} />
+                        </div>
+                      )}
+                    </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="text-left text-xs text-slate-500">
+                        <tr>
+                          <th className="py-1.5 pr-3 font-medium">Materia</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">1° Per.</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">2° Per.</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">Final</th>
+                          <th className="py-1.5 font-medium">
+                            <span className="sr-only">Estado</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {notasVisibles.map((c) => (
+                          <tr key={c.id} className={c.previa ? "bg-amber-50" : ""}>
+                            <td className="py-1.5 pr-3 text-slate-800">{c.materia}</td>
+                            {[c.primerCuatrimestre, c.segundoCuatrimestre, c.notaFinal].map((nota, i) => (
+                              <td
+                                key={i}
+                                className={`py-1.5 pr-3 text-right tabular-nums ${nota !== null && nota < 6 ? "font-semibold text-red-700" : "text-slate-700"}`}
+                              >
+                                {formatearNota(nota)}
+                              </td>
+                            ))}
+                            <td className="py-1.5">{c.previa && <Insignia tono="ambar">Previa</Insignia>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  </div>
+                )}
               </Seccion>
 
-              {legajo.contacto && (
-                <Seccion titulo="Contacto familiar" icono={<Phone className="h-4 w-4 text-slate-500" aria-hidden />}>
-                  <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Dato
-                      etiqueta="Domicilio"
-                      valor={
-                        [legajo.contacto.direccion, legajo.contacto.localidad].filter(Boolean).join(" · ") || "—"
-                      }
-                    />
-                    <Dato etiqueta="Email de contacto" valor={legajo.contacto.emailContacto ?? "—"} />
-                    <Dato
-                      etiqueta="Madre / Padre / Tutor"
-                      valor={<span className="whitespace-pre-line">{legajo.contacto.familiares ?? "—"}</span>}
-                    />
-                    <Dato
-                      etiqueta="Teléfonos"
-                      valor={<span className="whitespace-pre-line tabular-nums">{legajo.contacto.telefonosFamiliares ?? "—"}</span>}
-                    />
-                    <Dato
-                      etiqueta="Emails de familiares"
-                      valor={<span className="whitespace-pre-line break-all">{legajo.contacto.emailsFamiliares ?? "—"}</span>}
-                    />
-                  </dl>
-                </Seccion>
-              )}
+              <Seccion titulo="Asistencia mensual" icono={<CalendarCheck className="h-4 w-4 text-slate-500" aria-hidden />}>
+                <GraficoAsistenciaMensual meses={legajo.asistenciaMensual} />
+              </Seccion>
+
+              <Seccion
+                titulo="Régimen de convivencia"
+                icono={<ShieldAlert className="h-4 w-4 text-amber-600" aria-hidden />}
+                accion={
+                  legajo.convivencia && tienePermiso(rol, "CARGAR_INCIDENTE") && e.estadoMatricula === "REGULAR" ? (
+                    <button
+                      type="button"
+                      onClick={onCargarIncidente}
+                      className="inline-flex items-center gap-1 rounded-md bg-institucional-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-institucional-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" aria-hidden /> Cargar incidente
+                    </button>
+                  ) : undefined
+                }
+              >
+                {legajo.convivencia ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className={`h-full ${
+                            { ok: "bg-emerald-500", atencion: "bg-amber-500", critico: "bg-red-500" }[nivelAlertaPuntos(legajo.convivencia.puntos)]
+                          }`}
+                          style={{ width: `${(legajo.convivencia.puntos / PUNTOS_INICIALES) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold tabular-nums text-slate-900">
+                        {legajo.convivencia.puntos} / {PUNTOS_INICIALES} pts ICE
+                      </span>
+                    </div>
+
+                    <div>
+                      <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Faltas cargadas en el GEI</h4>
+                      {legajo.convivencia.faltasIce.length === 0 ? (
+                        <p className="text-sm text-slate-500">Sin faltas en Puntos ICE.</p>
+                      ) : (
+                        <table className="min-w-full text-sm">
+                          <thead className="text-left text-xs text-slate-500">
+                            <tr>
+                              <th className="py-1 pr-3 font-medium">Fecha</th>
+                              <th className="py-1 pr-3 font-medium">Tipo</th>
+                              <th className="py-1 pr-3 text-right font-medium">Puntos</th>
+                              <th className="py-1 font-medium">
+                                <span className="sr-only">Estado</span>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {legajo.convivencia.faltasIce.map((f) => (
+                              <tr key={f.id} className={f.dadaDeBaja ? "text-slate-400 line-through" : ""}>
+                                <td className="py-1 pr-3 tabular-nums">{formatearFecha(f.fecha)}</td>
+                                <td className="py-1 pr-3">
+                                  <Insignia tono={/grave/i.test(f.tipo) ? "rojo" : /moderada/i.test(f.tipo) ? "ambar" : "neutro"}>{f.tipo}</Insignia>
+                                </td>
+                                <td className="py-1 pr-3 text-right font-semibold tabular-nums">−{f.puntos}</td>
+                                <td className="py-1 text-xs no-underline">
+                                  {f.dadaDeBaja && <span className="no-underline">Dada de baja {formatearFecha(f.fechaBaja)}</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Incidentes y actas del LUE</h4>
+                    {legajo.convivencia.incidentes.length === 0 ? (
+                      <p className="text-sm text-slate-500">Sin incidentes registrados en el ciclo.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {legajo.convivencia.incidentes.map((i) => (
+                          <TarjetaIncidente
+                            key={i.id}
+                            incidente={i}
+                            modoDemo={modoDemo}
+                            puedeResolver={tienePermiso(rol, "APROBAR_INCIDENTE")}
+                            enProceso={incidenteEnProceso === i.id}
+                            onResolver={(accion) => onResolverIncidente(i.id, accion)}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <Bloqueado texto="El régimen de convivencia (puntos, sanciones y actas) no está disponible para el rol Docente." />
+                )}
+              </Seccion>
 
               {legajo.trayectoria && (
                 <Seccion titulo="Trayectoria escolar" icono={<School className="h-4 w-4 text-slate-500" aria-hidden />}>
@@ -441,97 +578,47 @@ export default function LegajoDetalle({
                 </Seccion>
               )}
 
-              <Seccion titulo="Calificaciones" icono={<BookOpen className="h-4 w-4 text-slate-500" aria-hidden />}>
-                {legajo.calificaciones.length === 0 ? (
-                  <p className="text-sm text-slate-500">Sin calificaciones importadas desde el GEI.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-left text-xs text-slate-500">
-                        <tr>
-                          <th className="py-1.5 pr-3 font-medium">Ciclo</th>
-                          <th className="py-1.5 pr-3 font-medium">Materia</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">1° Cuat.</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">2° Cuat.</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">Final</th>
-                          <th className="py-1.5 font-medium">
-                            <span className="sr-only">Estado</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {legajo.calificaciones.map((c) => (
-                          <tr key={c.id} className={c.previa ? "bg-amber-50" : ""}>
-                            <td className="py-1.5 pr-3 tabular-nums text-slate-500">{c.cicloLectivo}</td>
-                            <td className="py-1.5 pr-3 text-slate-800">{c.materia}</td>
-                            {[c.primerCuatrimestre, c.segundoCuatrimestre, c.notaFinal].map((nota, i) => (
-                              <td
-                                key={i}
-                                className={`py-1.5 pr-3 text-right tabular-nums ${nota !== null && nota < 6 ? "font-semibold text-red-700" : "text-slate-700"}`}
-                              >
-                                {formatearNota(nota)}
-                              </td>
-                            ))}
-                            <td className="py-1.5">{c.previa && <Insignia tono="ambar">Previa</Insignia>}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <Seccion titulo="Datos biográficos" icono={<User className="h-4 w-4 text-slate-500" aria-hidden />}>
+                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Dato etiqueta="DNI" valor={<span className="tabular-nums">{e.dni}</span>} />
+                  <Dato etiqueta="CUIL" valor={<span className="tabular-nums">{e.cuil ?? "—"}</span>} />
+                  <Dato
+                    etiqueta="Nacimiento"
+                    valor={`${formatearFecha(e.fechaNacimiento)}${edad(e.fechaNacimiento) !== null ? ` (${edad(e.fechaNacimiento)} años)` : ""}`}
+                  />
+                  <Dato etiqueta="Género" valor={e.genero ?? "—"} />
+                  <Dato etiqueta="Curso" valor={`${etiquetaCurso(e.anio, e.division)} · ${e.turno}`} />
+                  <Dato etiqueta="Promedio general" valor={formatearNota(e.promedioGeneral)} />
+                  <Dato etiqueta="Asistencia" valor={`${e.porcentajeAsistencia.toLocaleString("es-AR")}%`} />
+                  <Dato etiqueta="Última actualización" valor={formatearFecha(e.updatedAt)} />
+                </dl>
               </Seccion>
 
-              <Seccion
-                titulo="Régimen de convivencia"
-                icono={<ShieldAlert className="h-4 w-4 text-amber-600" aria-hidden />}
-                accion={
-                  legajo.convivencia && tienePermiso(rol, "CARGAR_INCIDENTE") && e.estadoMatricula === "REGULAR" ? (
-                    <button
-                      type="button"
-                      onClick={onCargarIncidente}
-                      className="inline-flex items-center gap-1 rounded-md bg-institucional-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-institucional-700"
-                    >
-                      <Plus className="h-3.5 w-3.5" aria-hidden /> Cargar incidente
-                    </button>
-                  ) : undefined
-                }
-              >
-                {legajo.convivencia ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className={`h-full ${
-                            { ok: "bg-emerald-500", atencion: "bg-amber-500", critico: "bg-red-500" }[nivelAlertaPuntos(legajo.convivencia.puntos)]
-                          }`}
-                          style={{ width: `${(legajo.convivencia.puntos / PUNTOS_INICIALES) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold tabular-nums text-slate-900">
-                        {legajo.convivencia.puntos} / {PUNTOS_INICIALES} pts
-                      </span>
-                    </div>
-                    {legajo.convivencia.incidentes.length === 0 ? (
-                      <p className="text-sm text-slate-500">Sin incidentes registrados en el ciclo.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {legajo.convivencia.incidentes.map((i) => (
-                          <TarjetaIncidente
-                            key={i.id}
-                            incidente={i}
-                            modoDemo={modoDemo}
-                            puedeResolver={tienePermiso(rol, "APROBAR_INCIDENTE")}
-                            enProceso={incidenteEnProceso === i.id}
-                            onResolver={(accion) => onResolverIncidente(i.id, accion)}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ) : (
-                  <Bloqueado texto="El régimen de convivencia (puntos, sanciones y actas) no está disponible para el rol Docente." />
-                )}
-              </Seccion>
+              {legajo.contacto && (
+                <Seccion titulo="Contacto familiar" icono={<Phone className="h-4 w-4 text-slate-500" aria-hidden />}>
+                  <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Dato
+                      etiqueta="Domicilio"
+                      valor={
+                        [legajo.contacto.direccion, legajo.contacto.localidad].filter(Boolean).join(" · ") || "—"
+                      }
+                    />
+                    <Dato etiqueta="Email de contacto" valor={legajo.contacto.emailContacto ?? "—"} />
+                    <Dato
+                      etiqueta="Madre / Padre / Tutor"
+                      valor={<span className="whitespace-pre-line">{legajo.contacto.familiares ?? "—"}</span>}
+                    />
+                    <Dato
+                      etiqueta="Teléfonos"
+                      valor={<span className="whitespace-pre-line tabular-nums">{legajo.contacto.telefonosFamiliares ?? "—"}</span>}
+                    />
+                    <Dato
+                      etiqueta="Emails de familiares"
+                      valor={<span className="whitespace-pre-line break-all">{legajo.contacto.emailsFamiliares ?? "—"}</span>}
+                    />
+                  </dl>
+                </Seccion>
+              )}
 
               <Seccion titulo="Informes del SOE" icono={<HeartPulse className="h-4 w-4 text-rose-600" aria-hidden />}>
                 {legajo.confidencial ? (

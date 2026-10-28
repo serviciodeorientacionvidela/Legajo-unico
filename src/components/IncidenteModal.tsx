@@ -125,15 +125,19 @@ export default function IncidenteModal({ abierto, rol, estudiante, onCerrar, onG
             nivel === "critico" ? "bg-red-50 ring-red-200" : nivel === "atencion" ? "bg-amber-50 ring-amber-200" : "bg-slate-50 ring-slate-200"
           }`}
         >
-          <span className="text-slate-600">Cálculo automático de puntos</span>
+          <span className="text-slate-600">Puntos ICE si se carga en el GEI</span>
           <span className="font-semibold tabular-nums text-slate-900">
             {estudiante.puntos} − {descuento} = <span className={nivel === "ok" ? "" : "text-red-700"}>{puntosResultantes}</span> pts
           </span>
         </div>
+        <p className="flex items-start gap-2 text-xs text-slate-500">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          El saldo oficial es el del GEI: cargue la falta en Puntos ICE y se verá reflejada en la próxima sincronización.
+        </p>
         {nivel !== "ok" && (
           <p className="flex items-start gap-2 text-xs text-red-700">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            El estudiante quedará con menos de 10 puntos: corresponde intervención del equipo directivo y del SOE.
+            El estudiante quedaría con menos de 10 puntos: corresponde intervención del equipo directivo y del SOE.
           </p>
         )}
 
@@ -175,8 +179,7 @@ export default function IncidenteModal({ abierto, rol, estudiante, onCerrar, onG
           <p className="flex items-start gap-2 rounded-md bg-institucional-50 px-3 py-2 text-xs text-institucional-700">
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
-              Como Preceptor/a, el incidente quedará <strong>pendiente de aprobación</strong> por Dirección. Los puntos se descontarán
-              cuando sea aprobado.
+              Como Preceptor/a, el incidente quedará <strong>pendiente de aprobación</strong> por Dirección.
             </span>
           </p>
         )}

@@ -121,12 +121,38 @@ export interface AlertaTempranaFuente {
   observaciones: string | null;
 }
 
+export interface FaltaIceFuente {
+  id: string;
+  cicloLectivo: number;
+  fecha: Fecha | null;
+  puntos: number;
+  tipo: string;
+  dadaDeBaja: boolean;
+  fechaBaja: Fecha | null;
+}
+
+export interface AsistenciaMensualFuente {
+  id: string;
+  cicloLectivo: number;
+  periodo: string;
+  orden: number;
+  mes: string;
+  justificadas: number | null;
+  injustificadas: number | null;
+  totalInasistencias: number | null;
+  diasAsistidos: number | null;
+  porcentaje: number | null;
+  cerrado: boolean;
+}
+
 export interface LegajoFuente extends EstudianteFuente {
   calificaciones: CalificacionFuente[];
   incidentes: IncidenteFuente[];
   intervenciones: IntervencionFuente[];
   trayectoria: TrayectoriaFuente[];
   alertas: AlertaTempranaFuente[];
+  faltasIce: FaltaIceFuente[];
+  asistencias: AsistenciaMensualFuente[];
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +200,29 @@ export interface IncidenteVisible {
   aprobado: boolean;
   anulado: boolean;
   autorNombre: string;
+}
+
+export interface FaltaIceVisible {
+  id: string;
+  cicloLectivo: number;
+  fecha: string | null;
+  puntos: number;
+  tipo: string;
+  dadaDeBaja: boolean;
+  fechaBaja: string | null;
+}
+
+export interface AsistenciaMensualVisible {
+  id: string;
+  cicloLectivo: number;
+  periodo: string;
+  mes: string;
+  justificadas: number | null;
+  injustificadas: number | null;
+  totalInasistencias: number | null;
+  diasAsistidos: number | null;
+  porcentaje: number | null;
+  cerrado: boolean;
 }
 
 export interface TrayectoriaVisible {
@@ -247,8 +296,10 @@ export interface LegajoVisible {
   } | null;
   /** Trayectoria escolar y alertas tempranas del GEI. null para DOCENTE. */
   trayectoria: { ciclos: TrayectoriaVisible[]; alertas: AlertaTempranaVisible[] } | null;
-  /** null para DOCENTE (sin acceso al régimen de convivencia). */
-  convivencia: { puntos: number; incidentes: IncidenteVisible[] } | null;
+  /** Resumen mensual de asistencia del GEI PAD, en orden. Visible para todos los roles. */
+  asistenciaMensual: AsistenciaMensualVisible[];
+  /** null para DOCENTE (sin acceso al régimen de convivencia). `puntos` es el saldo ICE del GEI. */
+  convivencia: { puntos: number; faltasIce: FaltaIceVisible[]; incidentes: IncidenteVisible[] } | null;
   /** Acuerdos pedagógicos del SOE, redactados sin datos clínicos. Visibles para todos los roles. */
   acuerdosSoe: AcuerdoDocenteVisible[];
   /** null salvo para DIRECTIVO_SOE. */

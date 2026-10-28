@@ -1,11 +1,13 @@
 /**
- * Reglas del régimen de convivencia por puntos (Acuerdos Escolares de Convivencia).
- * Cada estudiante inicia el ciclo con 20 puntos. Módulo puro: lo usan la API y la UI.
+ * Reglas del régimen de convivencia por puntos (Puntos ICE del GEI).
+ * Cada estudiante inicia el ciclo con 25 puntos. El saldo oficial es el del GEI, que se importa en
+ * cada sincronización; los incidentes del LUE documentan el hecho (acta, descargo, medida) pero no
+ * descuentan puntos. Módulo puro: lo usan la API y la UI.
  */
 
 import type { TipoIncidente } from "./types";
 
-export const PUNTOS_INICIALES = 20;
+export const PUNTOS_INICIALES = 25;
 
 export const REGLAS_INCIDENTE: Record<
   TipoIncidente,

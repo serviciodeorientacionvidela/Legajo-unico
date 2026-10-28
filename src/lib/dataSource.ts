@@ -5,7 +5,7 @@
  *   funciones de rbac.ts que usa la API, para mostrar en vivo qué recibe cada rol.
  */
 
-import { descuentoEfectivo, PUNTOS_INICIALES, validarPuntos } from "./convivencia";
+import { PUNTOS_INICIALES, validarPuntos } from "./convivencia";
 import { CICLO_DEMO, crearLegajosDemo, USUARIOS_DEMO } from "./demoData";
 import {
   AccesoDenegadoError,
@@ -257,10 +257,8 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
 
       const legajo = buscar(datos.dni);
       const aprobado = tienePermiso(rol, "APROBAR_INCIDENTE");
-      const puntos = aprobado
-        ? descuentoEfectivo(legajo.puntosConvivencia, datos.puntosDescontados)
-        : datos.puntosDescontados;
-      if (aprobado) legajo.puntosConvivencia -= puntos;
+      // Como en la API: el saldo de puntos lo administra el GEI, el incidente no lo modifica.
+      const puntos = datos.puntosDescontados;
 
       const id = nuevoId("inc");
       legajo.incidentes.push({
@@ -291,14 +289,8 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
 
       if (accion === "APROBAR") {
         if (incidente.aprobado) throw new ErrorFuenteDatos("El incidente ya estaba aprobado.", 409);
-        const puntos = descuentoEfectivo(legajo.puntosConvivencia, incidente.puntosDescontados);
-        legajo.puntosConvivencia -= puntos;
-        incidente.puntosDescontados = puntos;
         incidente.aprobado = true;
       } else {
-        if (incidente.aprobado) {
-          legajo.puntosConvivencia = Math.min(PUNTOS_INICIALES, legajo.puntosConvivencia + incidente.puntosDescontados);
-        }
         incidente.anulado = true;
       }
       legajo.updatedAt = new Date().toISOString();
@@ -393,6 +385,8 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
             incidentes: [],
             intervenciones: [],
             trayectoria: [],
+            faltasIce: [],
+            asistencias: [],
             alertas: [],
           });
           resultado.estudiantesCreados++;

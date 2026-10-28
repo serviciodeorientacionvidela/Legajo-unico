@@ -14,7 +14,13 @@ import {
   type CalificacionGei,
   type ResultadoImportacionGei,
 } from "./geiParser";
-import { parsearAlertas, parsearTrayectoria, type FichaGei } from "./geiFichas";
+import {
+  parsearAlertas,
+  parsearAsistenciaMensual,
+  parsearFaltasIce,
+  parsearTrayectoria,
+  type FichaGei,
+} from "./geiFichas";
 import {
   analizarAsistenciaMensual,
   analizarPlanillaEvaluaciones,
@@ -60,10 +66,11 @@ async function conConcurrencia<T>(items: T[], limite: number, tarea: (item: T) =
   await Promise.all(trabajadores);
 }
 
-/** Upsert de notas por (estudiante, materia, ciclo) y recálculo del promedio general del ciclo. */
+/** Upsert de notas por (estudiante, materia, ciclo) y, si corresponde, recálculo del promedio general del ciclo. */
 async function guardarCalificaciones(
   calificaciones: (CalificacionGei & { estudianteId: string })[],
   ciclo: number,
+  recalcularPromedio = true,
 ): Promise<number> {
   for (const lote of enLotes(calificaciones, TAMANO_LOTE)) {
     await prisma.$transaction(
@@ -89,7 +96,7 @@ async function guardarCalificaciones(
     );
   }
 
-  const idsAfectados = [...new Set(calificaciones.map((c) => c.estudianteId))];
+  const idsAfectados = recalcularPromedio ? [...new Set(calificaciones.map((c) => c.estudianteId))] : [];
   for (const lote of enLotes(idsAfectados, TAMANO_LOTE)) {
     const notas = await prisma.calificacionMateria.findMany({
       where: { estudianteId: { in: lote }, cicloLectivo: ciclo },
@@ -123,24 +130,30 @@ export interface ResultadoFichasGei {
   alumnosActualizados: number;
   ciclosTrayectoria: number;
   alertasTempranas: number;
+  faltasIce: number;
+  mesesAsistencia: number;
   /** DNIs de fichas que no están en la base (alumnos sin matrícula importada). */
   sinEstudiante: number;
   duracionMs: number;
 }
 
 /**
- * Importa la trayectoria escolar y las alertas tempranas de cada ficha del GEI.
- * El GEI es la fuente de verdad: se reemplazan completas por alumno en cada sincronización.
+ * Importa de cada ficha del GEI la trayectoria escolar, las alertas tempranas y, del escritorio PAD,
+ * los Puntos ICE (saldo oficial de convivencia) y la asistencia mensual del ciclo.
+ * El GEI es la fuente de verdad: se reemplaza todo por alumno en cada sincronización.
  */
 export async function importarFichasGei(
   fichas: FichaGei[],
-  opciones: { usuarioId: string; ipAddress?: string | null },
+  opciones: { usuarioId: string; cicloLectivo?: number; ipAddress?: string | null },
 ): Promise<ResultadoFichasGei> {
   const inicio = Date.now();
+  const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
   const resultado: ResultadoFichasGei = {
     alumnosActualizados: 0,
     ciclosTrayectoria: 0,
     alertasTempranas: 0,
+    faltasIce: 0,
+    mesesAsistencia: 0,
     sinEstudiante: 0,
     duracionMs: 0,
   };
@@ -158,15 +171,30 @@ export async function importarFichasGei(
     }
     const ciclos = parsearTrayectoria(ficha.trayectoria);
     const alertas = parsearAlertas(ficha.alertas);
+    const faltas = ficha.pad ? parsearFaltasIce(ficha.pad) : [];
+    const meses = ficha.pad ? parsearAsistenciaMensual(ficha.pad) : [];
     await prisma.$transaction([
       prisma.trayectoriaEscolar.deleteMany({ where: { estudianteId } }),
       prisma.alertaTemprana.deleteMany({ where: { estudianteId } }),
       prisma.trayectoriaEscolar.createMany({ data: ciclos.map((c) => ({ ...c, estudianteId })) }),
       prisma.alertaTemprana.createMany({ data: alertas.map((a) => ({ ...a, estudianteId })) }),
+      ...(ficha.pad
+        ? [
+            prisma.faltaIce.deleteMany({ where: { estudianteId, cicloLectivo: ciclo } }),
+            prisma.asistenciaMensual.deleteMany({ where: { estudianteId, cicloLectivo: ciclo } }),
+            prisma.faltaIce.createMany({ data: faltas.map((f) => ({ ...f, estudianteId, cicloLectivo: ciclo })) }),
+            prisma.asistenciaMensual.createMany({ data: meses.map((m) => ({ ...m, estudianteId, cicloLectivo: ciclo })) }),
+          ]
+        : []),
+      ...(ficha.pad?.totalIce != null
+        ? [prisma.estudiante.update({ where: { id: estudianteId }, data: { puntosConvivencia: ficha.pad.totalIce } })]
+        : []),
     ]);
     resultado.alumnosActualizados++;
     resultado.ciclosTrayectoria += ciclos.length;
     resultado.alertasTempranas += alertas.length;
+    resultado.faltasIce += faltas.length;
+    resultado.mesesAsistencia += meses.length;
   });
 
   await registrarAuditoria(opciones.usuarioId, null, "IMPORTAR_GEI", opciones.ipAddress ?? null);
@@ -197,7 +225,13 @@ export interface ResultadoPlanillasGei {
  */
 export async function importarPlanillasGei(
   planillas: PlanillasGei,
-  opciones: { usuarioId: string; cicloLectivo?: number; ipAddress?: string | null },
+  opciones: {
+    usuarioId: string;
+    cicloLectivo?: number;
+    ipAddress?: string | null;
+    /** Planillas de un ciclo ya cerrado: no se tocan la asistencia ni el promedio del ciclo en curso. */
+    cicloAnterior?: boolean;
+  },
 ): Promise<ResultadoPlanillasGei> {
   const inicio = Date.now();
   const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
@@ -218,7 +252,7 @@ export async function importarPlanillasGei(
       return [];
     }
   });
-  for (const lote of enLotes(consolidarAsistencia(meses), TAMANO_LOTE)) {
+  for (const lote of enLotes(opciones.cicloAnterior ? [] : consolidarAsistencia(meses), TAMANO_LOTE)) {
     const actualizaciones = await prisma.$transaction(
       lote.map((a) =>
         prisma.estudiante.updateMany({ where: { dni: a.dni }, data: { porcentajeAsistencia: a.porcentajeAsistencia } }),
@@ -240,13 +274,19 @@ export async function importarPlanillasGei(
     where: { estadoMatricula: "REGULAR" },
     select: { id: true, apellidos: true, nombres: true, anio: true, division: true },
   });
-  const idPorCursoYNombre = new Map(
-    alumnos.map((e) => [`${e.anio}-${e.division}|${claveNombre(`${e.apellidos} ${e.nombres}`)}`, e.id]),
-  );
+  // Ciclo en curso: cruce dentro de la división. Ciclos anteriores: los alumnos ya cambiaron de curso,
+  // así que se cruza por nombre en toda la escuela, descartando los nombres repetidos.
+  const clave = (anio: number, division: string, nombre: string) =>
+    opciones.cicloAnterior ? claveNombre(nombre) : `${anio}-${division}|${claveNombre(nombre)}`;
+  const idPorClave = new Map<string, string | null>();
+  for (const e of alumnos) {
+    const k = clave(e.anio, e.division, `${e.apellidos} ${e.nombres}`);
+    idPorClave.set(k, idPorClave.has(k) ? null : e.id);
+  }
 
   const calificaciones = planillasNotas.flatMap((planilla) =>
     planilla.notas.flatMap((n) => {
-      const estudianteId = idPorCursoYNombre.get(`${planilla.anio}-${planilla.division}|${claveNombre(n.nombre)}`);
+      const estudianteId = idPorClave.get(clave(planilla.anio, planilla.division, n.nombre));
       if (!estudianteId) {
         resultado.sinCruzar.push({ curso: `${planilla.anio}° ${planilla.division}ª`, materia: planilla.materia, nombre: n.nombre });
         return [];
@@ -267,7 +307,7 @@ export async function importarPlanillasGei(
       ];
     }),
   );
-  resultado.calificacionesActualizadas = await guardarCalificaciones(calificaciones, ciclo);
+  resultado.calificacionesActualizadas = await guardarCalificaciones(calificaciones, ciclo, !opciones.cicloAnterior);
 
   await registrarAuditoria(opciones.usuarioId, null, "IMPORTAR_GEI", opciones.ipAddress ?? null);
   resultado.duracionMs = Date.now() - inicio;
