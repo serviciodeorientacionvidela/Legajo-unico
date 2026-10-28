@@ -10,6 +10,7 @@ import {
   analizarLibroGei,
   calcularPromedio,
   deduplicarPorDni,
+  parsearCursoCombinado,
   type CalificacionGei,
   type ResultadoImportacionGei,
 } from "./geiParser";
@@ -101,6 +102,21 @@ async function guardarCalificaciones(
     if (operaciones.length > 0) await prisma.$transaction(operaciones);
   }
   return calificaciones.length;
+}
+
+/**
+ * Asigna el turno de cada división según el listado de divisiones del GEI (la matrícula no lo trae).
+ * Debe correr después de importar la matrícula. Devuelve la cantidad de alumnos actualizados.
+ */
+export async function actualizarTurnosGei(divisiones: { curso: string; turno: string }[]): Promise<number> {
+  const operaciones = divisiones.flatMap((d) => {
+    const curso = parsearCursoCombinado(d.curso);
+    const turno = d.turno.trim();
+    if (!curso || !turno) return [];
+    return [prisma.estudiante.updateMany({ where: { anio: curso.anio, division: curso.division }, data: { turno } })];
+  });
+  const resultados = await prisma.$transaction(operaciones);
+  return resultados.reduce((total, r) => total + r.count, 0);
 }
 
 export interface ResultadoFichasGei {

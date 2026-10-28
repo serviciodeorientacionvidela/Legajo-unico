@@ -184,10 +184,13 @@ async function importar(
   asistencias: ArchivoDescargado[],
   evaluaciones: ArchivoDescargado[],
   fichas: FichaGei[],
+  turnos: { curso: string; turno: string }[],
 ) {
   // Import dinámico: dotenv ya cargó DATABASE_URL antes de instanciar Prisma.
   const { prisma } = await import("../src/lib/prisma");
-  const { importarArchivoGei, importarFichasGei, importarPlanillasGei } = await import("../src/services/geiSyncService");
+  const { actualizarTurnosGei, importarArchivoGei, importarFichasGei, importarPlanillasGei } = await import(
+    "../src/services/geiSyncService"
+  );
 
   const emailResponsable = requerirEnv("GEI_SYNC_USER_EMAIL");
   const responsable = await prisma.usuario.findUnique({ where: { email: emailResponsable } });
@@ -197,6 +200,8 @@ async function importar(
 
   try {
     if (matricula) await importarMatriculaYPlanillas(matricula, responsable.id);
+    // Después de la matrícula, que no trae el turno.
+    if (turnos.length > 0) console.log(`📊 Turnos: ${await actualizarTurnosGei(turnos)} alumnos actualizados`);
     if (fichas.length > 0) {
       const f = await importarFichasGei(fichas, { usuarioId: responsable.id, ipAddress: "gei-scraper" });
       console.log(`📊 Fichas: ${f.alumnosActualizados} alumnos · ${f.ciclosTrayectoria} ciclos de trayectoria · ${f.alertasTempranas} alertas tempranas`);
@@ -235,6 +240,18 @@ async function importar(
       porCurso.forEach((n, curso) => console.warn(`     ${curso}: ${n}`));
     }
   }
+}
+
+/** Turno de cada división de la escuela ("3° 4ª Secundario" → "Tarde"). */
+async function listarTurnos(contexto: BrowserContext): Promise<{ curso: string; turno: string }[]> {
+  const respuesta = await contexto.request.post(`${URL_GEI}division/listar_data/${ESCUELA_ID}/escuela_alu/${ESCUELA_ID}`, {
+    form: { draw: "1", start: "0", length: "500" },
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+    timeout: TIMEOUT_MS,
+  });
+  if (!respuesta.ok()) throw new Error(`El listado de divisiones del GEI respondió ${respuesta.status()}.`);
+  const { data } = (await respuesta.json()) as { data: { curso: string; division: string; turno: string | null }[] };
+  return data.map((d) => ({ curso: `${d.curso} ${d.division}`, turno: d.turno ?? "" }));
 }
 
 /** Alumnos del ciclo en los años configurados, con el id de su ficha en el GEI (uno por DNI). */
@@ -320,6 +337,7 @@ async function main(): Promise<void> {
   const asistencias: ArchivoDescargado[] = [];
   const evaluaciones: ArchivoDescargado[] = [];
   let fichas: FichaGei[] = [];
+  let turnos: { curso: string; turno: string }[] = [];
 
   try {
     await iniciarSesion(page);
@@ -346,6 +364,7 @@ async function main(): Promise<void> {
         console.log(`✓ ${d.curso}: ${d.mesesCerrados.length} meses de asistencia, ${cursadas.length} materias`);
       }
     }
+    turnos = await listarTurnos(contexto);
     if (!SIN_FICHAS) fichas = await leerFichas(contexto);
   } catch (error) {
     const captura = path.join(CARPETA_DESCARGAS, `error-${Date.now()}.png`);
@@ -364,7 +383,7 @@ async function main(): Promise<void> {
     console.log("Modo --solo-descargar: no se importaron los archivos.");
     return;
   }
-  await importar(matricula, asistencias, evaluaciones, fichas);
+  await importar(matricula, asistencias, evaluaciones, fichas, turnos);
   console.log("\n✓ Sincronización GEI finalizada.");
 }
 

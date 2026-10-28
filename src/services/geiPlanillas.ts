@@ -129,13 +129,17 @@ export function analizarPlanillaEvaluaciones(datos: ArrayBuffer | Uint8Array, ar
     if (k === -1) return null;
     return [inicios[k]!.i, inicios[k + 1]?.i ?? encabezados.length];
   };
+  // La nota del período está en "Cierre de Periodo"; algunas divisiones la cargan como "Equivalencia Directa".
   const cierreDe = (rotulo: string): number | null => {
     const r = rango(rotulo);
     if (!r) return null;
+    let equivalencia: number | null = null;
     for (let i = r[0]; i < r[1]; i++) {
-      if (normalizarTexto(celdaTexto(encabezados[i])) === "cierre de periodo") return i;
+      const encabezado = normalizarTexto(celdaTexto(encabezados[i]));
+      if (encabezado === "cierre de periodo") return i;
+      if (encabezado.startsWith("equivalencia directa")) equivalencia = i;
     }
-    return null;
+    return equivalencia;
   };
   const columnas = {
     primerPeriodo: cierreDe("primer periodo"),
