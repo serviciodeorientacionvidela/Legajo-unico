@@ -14,6 +14,7 @@
 
 import { PUNTOS_INICIALES } from "./convivencia";
 import type {
+  AlertaTempranaFuente,
   CalificacionFuente,
   EstadoMatricula,
   IncidenteFuente,
@@ -21,6 +22,7 @@ import type {
   LegajoFuente,
   Rol,
   TipoIncidente,
+  TrayectoriaFuente,
   UsuarioSesion,
 } from "./types";
 
@@ -258,6 +260,44 @@ function generarIntervenciones(spec: SpecAlumno): IntervencionFuente[] {
   }));
 }
 
+/** Secundaria en la escuela demo (un ciclo por año cursado) precedida por 7° grado en una primaria ficticia. */
+function generarTrayectoria(spec: SpecAlumno): TrayectoriaFuente[] {
+  const ciclos: TrayectoriaFuente[] = [];
+  for (let anio = spec.anio; anio >= 0; anio--) {
+    const ciclo = CICLO_DEMO - (spec.anio - anio);
+    const actual = anio === spec.anio;
+    const primaria = anio === 0;
+    ciclos.push({
+      id: `${spec.dni}-tray-${ciclo}`,
+      cicloLectivo: ciclo,
+      condicion: "Regular",
+      escuela: primaria ? "1999 - ESCUELA PRIMARIA DEMO" : "4999 - ESCUELA SECUNDARIA DEMO",
+      division: primaria ? "7° A" : `${anio}° ${spec.division}ª`,
+      fechaIngreso: `${ciclo}-02-24T00:00:00.000Z`,
+      motivoIngreso: "PROMOCIÓN",
+      fechaEgreso: actual ? null : `${ciclo}-12-15T00:00:00.000Z`,
+      motivoEgreso: actual ? null : primaria ? "EGRESO DE NIVEL" : "PROMOCIÓN",
+      activo: actual,
+      inasistencias: actual ? null : 12,
+    });
+  }
+  return ciclos;
+}
+
+function generarAlertas(spec: SpecAlumno): AlertaTempranaFuente[] {
+  if (spec.asistencia >= 85) return [];
+  return [
+    {
+      id: `${spec.dni}-alerta-0`,
+      fecha: `${CICLO_DEMO}-05-20T00:00:00.000Z`,
+      escuela: "4999 - ESCUELA SECUNDARIA DEMO",
+      causas: "Factores Escolares: Inasistencias reiteradas",
+      planIntervencion: "Entrevista con familia o adulto responsable",
+      observaciones: "Se cita a la familia y se firma acta de compromiso por inasistencias.",
+    },
+  ];
+}
+
 function construirLegajo(spec: SpecAlumno): LegajoFuente {
   const calificaciones = generarCalificaciones(spec);
   const incidentes = generarIncidentes(spec);
@@ -305,6 +345,8 @@ function construirLegajo(spec: SpecAlumno): LegajoFuente {
     calificaciones,
     incidentes,
     intervenciones: generarIntervenciones(spec),
+    trayectoria: generarTrayectoria(spec),
+    alertas: generarAlertas(spec),
   };
 }
 

@@ -13,6 +13,7 @@ import {
   type CalificacionGei,
   type ResultadoImportacionGei,
 } from "./geiParser";
+import { parsearAlertas, parsearTrayectoria, type FichaGei } from "./geiFichas";
 import {
   analizarAsistenciaMensual,
   analizarPlanillaEvaluaciones,
@@ -100,6 +101,61 @@ async function guardarCalificaciones(
     if (operaciones.length > 0) await prisma.$transaction(operaciones);
   }
   return calificaciones.length;
+}
+
+export interface ResultadoFichasGei {
+  alumnosActualizados: number;
+  ciclosTrayectoria: number;
+  alertasTempranas: number;
+  /** DNIs de fichas que no están en la base (alumnos sin matrícula importada). */
+  sinEstudiante: number;
+  duracionMs: number;
+}
+
+/**
+ * Importa la trayectoria escolar y las alertas tempranas de cada ficha del GEI.
+ * El GEI es la fuente de verdad: se reemplazan completas por alumno en cada sincronización.
+ */
+export async function importarFichasGei(
+  fichas: FichaGei[],
+  opciones: { usuarioId: string; ipAddress?: string | null },
+): Promise<ResultadoFichasGei> {
+  const inicio = Date.now();
+  const resultado: ResultadoFichasGei = {
+    alumnosActualizados: 0,
+    ciclosTrayectoria: 0,
+    alertasTempranas: 0,
+    sinEstudiante: 0,
+    duracionMs: 0,
+  };
+  const alumnos = await prisma.estudiante.findMany({
+    where: { dni: { in: fichas.map((f) => f.dni) } },
+    select: { id: true, dni: true },
+  });
+  const idPorDni = new Map(alumnos.map((a) => [a.dni, a.id]));
+
+  await conConcurrencia(fichas, CONCURRENCIA_DRIVE, async (ficha) => {
+    const estudianteId = idPorDni.get(ficha.dni);
+    if (!estudianteId) {
+      resultado.sinEstudiante++;
+      return;
+    }
+    const ciclos = parsearTrayectoria(ficha.trayectoria);
+    const alertas = parsearAlertas(ficha.alertas);
+    await prisma.$transaction([
+      prisma.trayectoriaEscolar.deleteMany({ where: { estudianteId } }),
+      prisma.alertaTemprana.deleteMany({ where: { estudianteId } }),
+      prisma.trayectoriaEscolar.createMany({ data: ciclos.map((c) => ({ ...c, estudianteId })) }),
+      prisma.alertaTemprana.createMany({ data: alertas.map((a) => ({ ...a, estudianteId })) }),
+    ]);
+    resultado.alumnosActualizados++;
+    resultado.ciclosTrayectoria += ciclos.length;
+    resultado.alertasTempranas += alertas.length;
+  });
+
+  await registrarAuditoria(opciones.usuarioId, null, "IMPORTAR_GEI", opciones.ipAddress ?? null);
+  resultado.duracionMs = Date.now() - inicio;
+  return resultado;
 }
 
 export interface PlanillasGei {

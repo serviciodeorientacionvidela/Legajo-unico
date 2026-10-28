@@ -11,8 +11,10 @@ import {
   Loader2,
   Phone,
   Plus,
+  School,
   ShieldAlert,
   Trash2,
+  TriangleAlert,
   User,
   X,
 } from "lucide-react";
@@ -363,6 +365,79 @@ export default function LegajoDetalle({
                       valor={<span className="whitespace-pre-line break-all">{legajo.contacto.emailsFamiliares ?? "—"}</span>}
                     />
                   </dl>
+                </Seccion>
+              )}
+
+              {legajo.trayectoria && (
+                <Seccion titulo="Trayectoria escolar" icono={<School className="h-4 w-4 text-slate-500" aria-hidden />}>
+                  {legajo.trayectoria.ciclos.length === 0 ? (
+                    <p className="text-sm text-slate-500">Sin trayectoria importada desde el GEI.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-xs text-slate-500">
+                          <tr>
+                            <th className="py-1.5 pr-3 font-medium">Ciclo</th>
+                            <th className="py-1.5 pr-3 font-medium">Escuela</th>
+                            <th className="py-1.5 pr-3 font-medium">Curso</th>
+                            <th className="py-1.5 pr-3 font-medium">Condición</th>
+                            <th className="py-1.5 pr-3 font-medium">Resultado</th>
+                            <th className="py-1.5 text-right font-medium">Inasist.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {legajo.trayectoria.ciclos.map((t) => {
+                            const repitio = /PERMANENCIA/i.test(t.motivoEgreso ?? "");
+                            return (
+                              <tr key={t.id} className={repitio ? "bg-amber-50" : ""}>
+                                <td className="py-1.5 pr-3 tabular-nums text-slate-500">{t.cicloLectivo}</td>
+                                <td className="py-1.5 pr-3 text-slate-800">{t.escuela}</td>
+                                <td className="py-1.5 pr-3 text-slate-700">{t.division ?? "—"}</td>
+                                <td className="py-1.5 pr-3 text-slate-700">{t.condicion ?? "—"}</td>
+                                <td className="py-1.5 pr-3">
+                                  {t.activo ? (
+                                    <Insignia tono="azul">En curso</Insignia>
+                                  ) : repitio ? (
+                                    <Insignia tono="ambar" titulo={`Egreso ${formatearFecha(t.fechaEgreso)}`}>
+                                      Permanencia (repitió)
+                                    </Insignia>
+                                  ) : (
+                                    <span className="text-xs text-slate-600" title={`Egreso ${formatearFecha(t.fechaEgreso)}`}>
+                                      {t.motivoEgreso ?? "—"}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 text-right tabular-nums text-slate-700">
+                                  {t.inasistencias === null ? "—" : t.inasistencias.toLocaleString("es-AR")}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Seccion>
+              )}
+
+              {legajo.trayectoria && legajo.trayectoria.alertas.length > 0 && (
+                <Seccion
+                  titulo="Alertas tempranas (GEI)"
+                  icono={<TriangleAlert className="h-4 w-4 text-amber-600" aria-hidden />}
+                >
+                  <ul className="space-y-3">
+                    {legajo.trayectoria.alertas.map((a) => (
+                      <li key={a.id} className="rounded-md border border-slate-200 p-3 text-sm">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="font-medium text-slate-800">{a.causas}</p>
+                          <span className="text-xs tabular-nums text-slate-500">{formatearFecha(a.fecha)}</span>
+                        </div>
+                        {a.planIntervencion && <p className="mt-1 text-slate-700">Plan: {a.planIntervencion}</p>}
+                        {a.observaciones && <p className="mt-1 text-slate-600">{a.observaciones}</p>}
+                        {a.escuela && <p className="mt-1 text-xs text-slate-500">{a.escuela}</p>}
+                      </li>
+                    ))}
+                  </ul>
                 </Seccion>
               )}
 

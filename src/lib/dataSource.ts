@@ -392,6 +392,8 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
             calificaciones: [],
             incidentes: [],
             intervenciones: [],
+            trayectoria: [],
+            alertas: [],
           });
           resultado.estudiantesCreados++;
           resultado.carpetasDriveCreadas++;

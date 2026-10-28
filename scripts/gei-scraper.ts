@@ -5,7 +5,8 @@
  * para los años configurados (GEI_ANIOS):
  *   - la matrícula (alumno/excel_alumnos): datos personales y de contacto,
  *   - la asistencia de cada mes cerrado de cada división (division_inasistencia/resumen_diario_imprimir_excel),
- *   - el resumen de evaluaciones de cada espacio curricular (cursada/excel_resumen_evaluaciones_generico).
+ *   - el resumen de evaluaciones de cada espacio curricular (cursada/excel_resumen_evaluaciones_generico),
+ *   - la ficha de cada alumno (alumno/ver): trayectoria escolar y alertas tempranas.
  * Luego importa todo con geiSyncService (upsert en PostgreSQL + carpetas en Google Drive + auditoría).
  *
  * Solo navega y descarga: nunca hace clic en botones que modifiquen el GEI.
@@ -15,6 +16,8 @@
  *   npm run gei:scrape -- --headed         # con navegador visible (para calibrar)
  *   npm run gei:scrape -- --solo-descargar # descarga sin importar
  *   npm run gei:scrape -- --sin-drive      # importa sin sincronizar Google Drive
+ *   npm run gei:scrape -- --solo-fichas    # solo trayectoria y alertas tempranas (sin planillas)
+ *   npm run gei:scrape -- --sin-fichas     # omite las fichas (más rápido)
  *
  * Variables de entorno (ver .env.example): GEI_USER, GEI_PASS, GEI_SYNC_USER_EMAIL y, opcionalmente,
  * GEI_LOGIN_URL, GEI_BASE_URL, GEI_ESCUELA_ID, GEI_ANIOS, GEI_CICLO.
@@ -26,6 +29,7 @@ import { config as cargarEnv } from "dotenv";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
+import { ROTULOS_TABLA_ALERTAS, ROTULOS_TABLA_TRAYECTORIA, type FichaGei } from "../src/services/geiFichas";
 
 cargarEnv({ path: ".env.local" });
 cargarEnv();
@@ -34,6 +38,8 @@ const argumentos = new Set(process.argv.slice(2));
 const MODO_VISIBLE = argumentos.has("--headed");
 const SOLO_DESCARGAR = argumentos.has("--solo-descargar");
 const SIN_DRIVE = argumentos.has("--sin-drive");
+const SOLO_FICHAS = argumentos.has("--solo-fichas");
+const SIN_FICHAS = argumentos.has("--sin-fichas");
 
 const URL_INGRESO = process.env.GEI_LOGIN_URL ?? "https://intranet.mendoza.edu.ar/usuarios/auth/login";
 const URL_GEI = (process.env.GEI_BASE_URL ?? "https://dti.mendoza.edu.ar/gem/").replace(/\/?$/, "/");
@@ -173,10 +179,15 @@ function slug(texto: string): string {
   return texto.normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
 }
 
-async function importar(matricula: ArchivoDescargado, asistencias: ArchivoDescargado[], evaluaciones: ArchivoDescargado[]) {
+async function importar(
+  matricula: ArchivoDescargado | null,
+  asistencias: ArchivoDescargado[],
+  evaluaciones: ArchivoDescargado[],
+  fichas: FichaGei[],
+) {
   // Import dinámico: dotenv ya cargó DATABASE_URL antes de instanciar Prisma.
   const { prisma } = await import("../src/lib/prisma");
-  const { importarArchivoGei, importarPlanillasGei } = await import("../src/services/geiSyncService");
+  const { importarArchivoGei, importarFichasGei, importarPlanillasGei } = await import("../src/services/geiSyncService");
 
   const emailResponsable = requerirEnv("GEI_SYNC_USER_EMAIL");
   const responsable = await prisma.usuario.findUnique({ where: { email: emailResponsable } });
@@ -185,8 +196,19 @@ async function importar(matricula: ArchivoDescargado, asistencias: ArchivoDescar
   }
 
   try {
+    if (matricula) await importarMatriculaYPlanillas(matricula, responsable.id);
+    if (fichas.length > 0) {
+      const f = await importarFichasGei(fichas, { usuarioId: responsable.id, ipAddress: "gei-scraper" });
+      console.log(`📊 Fichas: ${f.alumnosActualizados} alumnos · ${f.ciclosTrayectoria} ciclos de trayectoria · ${f.alertasTempranas} alertas tempranas`);
+      if (f.sinEstudiante > 0) console.warn(`   ⚠ ${f.sinEstudiante} fichas de alumnos que no están en la base`);
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+
+  async function importarMatriculaYPlanillas(matricula: ArchivoDescargado, usuarioId: string) {
     const m = await importarArchivoGei(matricula.datos, {
-      usuarioId: responsable.id,
+      usuarioId,
       nombreArchivo: matricula.nombre,
       cicloLectivo: CICLO,
       anios: ANIOS,
@@ -199,7 +221,7 @@ async function importar(matricula: ArchivoDescargado, asistencias: ArchivoDescar
     m.errores.forEach((e) => console.warn(`   ✗ [fila ${e.fila}] ${e.motivo.replace(/\d{7,8}/g, "<dni>")}`));
 
     const p = await importarPlanillasGei({ asistencias, evaluaciones }, {
-      usuarioId: responsable.id,
+      usuarioId,
       cicloLectivo: CICLO,
       ipAddress: "gei-scraper",
     });
@@ -212,9 +234,79 @@ async function importar(matricula: ArchivoDescargado, asistencias: ArchivoDescar
       p.sinCruzar.forEach((s) => porCurso.set(s.curso, (porCurso.get(s.curso) ?? 0) + 1));
       porCurso.forEach((n, curso) => console.warn(`     ${curso}: ${n}`));
     }
-  } finally {
-    await prisma.$disconnect();
   }
+}
+
+/** Alumnos del ciclo en los años configurados, con el id de su ficha en el GEI (uno por DNI). */
+async function listarAlumnosGei(contexto: BrowserContext): Promise<{ dni: string; alumnoId: string }[]> {
+  const respuesta = await contexto.request.post(`${URL_GEI}alumno/listar_data/${ESCUELA_ID}/${CICLO}`, {
+    form: { draw: "1", start: "0", length: "5000" },
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+    timeout: TIMEOUT_MS,
+  });
+  if (!respuesta.ok()) throw new Error(`El listado de alumnos del GEI respondió ${respuesta.status()}.`);
+  const { data } = (await respuesta.json()) as { data: { id: string; documento: string; curso: string }[] };
+  const porDni = new Map<string, string>();
+  for (const a of data) {
+    const dni = /^DNI (\d{7,8})$/.exec(a.documento.trim())?.[1];
+    const anio = Number(/^(\d)°/.exec(a.curso.trim())?.[1] ?? 0);
+    if (dni && ANIOS.includes(anio)) porDni.set(dni, a.id);
+  }
+  return [...porDni].map(([dni, alumnoId]) => ({ dni, alumnoId }));
+}
+
+// Se pasa como texto: tsx/esbuild agrega helpers (__name) a las funciones que no existen en el navegador.
+const SCRIPT_TABLAS_FICHA = `(() => {
+  const limpiar = (s) => (s ?? "").replace(/\\s+/g, " ").trim();
+  const filasDe = (rotulos) => {
+    const tabla = [...document.querySelectorAll("table")].find((t) => {
+      const encabezado = limpiar(t.querySelector("thead")?.textContent);
+      return rotulos.every((r) => encabezado.includes(r));
+    });
+    if (!tabla) return null;
+    return [...tabla.querySelectorAll("tbody tr")]
+      .map((tr) => [...tr.querySelectorAll("td")].map((td) => limpiar(td.textContent)))
+      .filter((celdas) => celdas.length > 1);
+  };
+  return {
+    trayectoria: filasDe(${JSON.stringify(ROTULOS_TABLA_TRAYECTORIA)}),
+    alertas: filasDe(${JSON.stringify(ROTULOS_TABLA_ALERTAS)}),
+    pideLogin: document.querySelector('input[type="password"]') !== null,
+  };
+})()`;
+
+/** Lee la trayectoria y las alertas tempranas de la ficha de cada alumno (alumno/ver). */
+async function leerFichas(contexto: BrowserContext): Promise<FichaGei[]> {
+  const alumnos = await listarAlumnosGei(contexto);
+  console.log(`→ ${alumnos.length} fichas de alumnos para leer`);
+  // Página auxiliar sin red: solo se usa para parsear el HTML de cada ficha con el DOM del navegador.
+  const parseo = await contexto.newPage();
+  await parseo.route("**/*", (ruta) => ruta.abort());
+  const fichas: FichaGei[] = [];
+  try {
+    for (const [i, { dni, alumnoId }] of alumnos.entries()) {
+      const html = await (await contexto.request.get(`${URL_GEI}alumno/ver/${alumnoId}`, { timeout: TIMEOUT_MS })).text();
+      await parseo.setContent(html.replace(/<script[\s\S]*?<\/script>/gi, ""), { waitUntil: "domcontentloaded" });
+      const tablas = (await parseo.evaluate(SCRIPT_TABLAS_FICHA)) as {
+        trayectoria: string[][] | null;
+        alertas: string[][] | null;
+        pideLogin: boolean;
+      };
+      if (tablas.trayectoria === null) {
+        if (tablas.pideLogin) throw new Error("La sesión del GEI venció mientras se leían las fichas.");
+        console.warn(`  ⚠ Ficha ${alumnoId}: no se encontró la tabla de trayectoria; se omite.`);
+        omitidos.push(`ficha_${alumnoId}`);
+        continue;
+      }
+      fichas.push({ dni, trayectoria: tablas.trayectoria, alertas: tablas.alertas ?? [] });
+      if ((i + 1) % 50 === 0) console.log(`  … ${i + 1}/${alumnos.length} fichas`);
+      await esperar(PAUSA_ENTRE_DESCARGAS_MS);
+    }
+  } finally {
+    await parseo.close();
+  }
+  console.log(`✓ Fichas leídas: ${fichas.length}`);
+  return fichas;
 }
 
 async function main(): Promise<void> {
@@ -224,34 +316,37 @@ async function main(): Promise<void> {
   const navegador = await chromium.launch({ headless: !MODO_VISIBLE });
   const contexto = await navegador.newContext({ acceptDownloads: true, locale: "es-AR" });
   let page = await contexto.newPage();
-  let matricula: ArchivoDescargado;
+  let matricula: ArchivoDescargado | null = null;
   const asistencias: ArchivoDescargado[] = [];
   const evaluaciones: ArchivoDescargado[] = [];
+  let fichas: FichaGei[] = [];
 
   try {
     await iniciarSesion(page);
     page = await entrarAlGei(contexto, page);
 
-    const archivoMatricula = await descargar(contexto, `alumno/excel_alumnos/${ESCUELA_ID}/${CICLO}`, "matricula");
-    if (!archivoMatricula) throw new Error("No se pudo descargar la matrícula.");
-    matricula = archivoMatricula;
-    console.log("✓ Matrícula descargada");
+    if (!SOLO_FICHAS) {
+      matricula = await descargar(contexto, `alumno/excel_alumnos/${ESCUELA_ID}/${CICLO}`, "matricula");
+      if (!matricula) throw new Error("No se pudo descargar la matrícula.");
+      console.log("✓ Matrícula descargada");
 
-    const divisiones = await listarDivisiones(page);
-    console.log(`→ ${divisiones.length} divisiones de ${ANIOS.join("°, ")}°`);
-    for (const d of divisiones) {
-      const prefijo = slug(d.curso);
-      for (const mesId of d.mesesCerrados) {
-        const archivo = await descargar(contexto, `division_inasistencia/resumen_diario_imprimir_excel/${mesId}/1`, `asistencia_${prefijo}_${mesId}`);
-        if (archivo) asistencias.push(archivo);
+      const divisiones = await listarDivisiones(page);
+      console.log(`→ ${divisiones.length} divisiones de ${ANIOS.join("°, ")}°`);
+      for (const d of divisiones) {
+        const prefijo = slug(d.curso);
+        for (const mesId of d.mesesCerrados) {
+          const archivo = await descargar(contexto, `division_inasistencia/resumen_diario_imprimir_excel/${mesId}/1`, `asistencia_${prefijo}_${mesId}`);
+          if (archivo) asistencias.push(archivo);
+        }
+        const cursadas = await listarCursadas(page, d.divisionId);
+        for (const cursadaId of cursadas) {
+          const archivo = await descargar(contexto, `cursada/excel_resumen_evaluaciones_generico/${cursadaId}/${CICLO}`, `notas_${prefijo}_${cursadaId}`);
+          if (archivo) evaluaciones.push(archivo);
+        }
+        console.log(`✓ ${d.curso}: ${d.mesesCerrados.length} meses de asistencia, ${cursadas.length} materias`);
       }
-      const cursadas = await listarCursadas(page, d.divisionId);
-      for (const cursadaId of cursadas) {
-        const archivo = await descargar(contexto, `cursada/excel_resumen_evaluaciones_generico/${cursadaId}/${CICLO}`, `notas_${prefijo}_${cursadaId}`);
-        if (archivo) evaluaciones.push(archivo);
-      }
-      console.log(`✓ ${d.curso}: ${d.mesesCerrados.length} meses de asistencia, ${cursadas.length} materias`);
     }
+    if (!SIN_FICHAS) fichas = await leerFichas(contexto);
   } catch (error) {
     const captura = path.join(CARPETA_DESCARGAS, `error-${Date.now()}.png`);
     await page.screenshot({ path: captura, fullPage: true }).catch(() => undefined);
@@ -261,13 +356,15 @@ async function main(): Promise<void> {
     await navegador.close();
   }
 
-  console.log(`\n✓ Descargados: 1 matrícula, ${asistencias.length} asistencias, ${evaluaciones.length} planillas de notas`);
+  if (matricula) {
+    console.log(`\n✓ Descargados: 1 matrícula, ${asistencias.length} asistencias, ${evaluaciones.length} planillas de notas`);
+  }
   if (omitidos.length > 0) console.warn(`⚠ Omitidos (${omitidos.length}): ${omitidos.join(", ")}`);
   if (SOLO_DESCARGAR) {
     console.log("Modo --solo-descargar: no se importaron los archivos.");
     return;
   }
-  await importar(matricula, asistencias, evaluaciones);
+  await importar(matricula, asistencias, evaluaciones, fichas);
   console.log("\n✓ Sincronización GEI finalizada.");
 }
 

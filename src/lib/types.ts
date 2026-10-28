@@ -98,10 +98,35 @@ export interface IntervencionFuente {
   profesional: { nombre: string };
 }
 
+export interface TrayectoriaFuente {
+  id: string;
+  cicloLectivo: number;
+  condicion: string | null;
+  escuela: string;
+  division: string | null;
+  fechaIngreso: Fecha | null;
+  motivoIngreso: string | null;
+  fechaEgreso: Fecha | null;
+  motivoEgreso: string | null;
+  activo: boolean;
+  inasistencias: number | null;
+}
+
+export interface AlertaTempranaFuente {
+  id: string;
+  fecha: Fecha | null;
+  escuela: string | null;
+  causas: string;
+  planIntervencion: string | null;
+  observaciones: string | null;
+}
+
 export interface LegajoFuente extends EstudianteFuente {
   calificaciones: CalificacionFuente[];
   incidentes: IncidenteFuente[];
   intervenciones: IntervencionFuente[];
+  trayectoria: TrayectoriaFuente[];
+  alertas: AlertaTempranaFuente[];
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +176,29 @@ export interface IncidenteVisible {
   autorNombre: string;
 }
 
+export interface TrayectoriaVisible {
+  id: string;
+  cicloLectivo: number;
+  condicion: string | null;
+  escuela: string;
+  division: string | null;
+  fechaIngreso: string | null;
+  motivoIngreso: string | null;
+  fechaEgreso: string | null;
+  motivoEgreso: string | null;
+  activo: boolean;
+  inasistencias: number | null;
+}
+
+export interface AlertaTempranaVisible {
+  id: string;
+  fecha: string | null;
+  escuela: string | null;
+  causas: string;
+  planIntervencion: string | null;
+  observaciones: string | null;
+}
+
 export interface AcuerdoDocenteVisible {
   id: string;
   fecha: string;
@@ -197,6 +245,8 @@ export interface LegajoVisible {
     emailsFamiliares: string | null;
     emailContacto: string | null;
   } | null;
+  /** Trayectoria escolar y alertas tempranas del GEI. null para DOCENTE. */
+  trayectoria: { ciclos: TrayectoriaVisible[]; alertas: AlertaTempranaVisible[] } | null;
   /** null para DOCENTE (sin acceso al régimen de convivencia). */
   convivencia: { puntos: number; incidentes: IncidenteVisible[] } | null;
   /** Acuerdos pedagógicos del SOE, redactados sin datos clínicos. Visibles para todos los roles. */

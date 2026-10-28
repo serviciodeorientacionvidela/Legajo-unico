@@ -93,6 +93,8 @@ model Estudiante {
   calificaciones CalificacionMateria[]
   incidentes     IncidenteConvivencia[]
   intervenciones IntervencionSoe[]
+  trayectoria    TrayectoriaEscolar[]
+  alertas        AlertaTemprana[]
 
   @@index([anio, division])
   @@index([apellidos])
@@ -110,6 +112,42 @@ model CalificacionMateria {
   previa              Boolean    @default(false)
 
   @@unique([estudianteId, materia, cicloLectivo])
+}
+
+// --- Ficha del alumno en el GEI: se reemplaza completa en cada sincronización. PRECEPTOR y DIRECTIVO_SOE ---
+
+/** Un renglón por ciclo y escuela (incluye primaria y otras escuelas). */
+model TrayectoriaEscolar {
+  id            String     @id @default(cuid())
+  estudianteId  String
+  estudiante    Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  cicloLectivo  Int
+  condicion     String?
+  escuela       String
+  division      String?
+  fechaIngreso  DateTime?
+  motivoIngreso String?
+  fechaEgreso   DateTime?
+  /// PROMOCIÓN, PERMANENCIA (repitencia), pase, etc.
+  motivoEgreso  String?
+  activo        Boolean    @default(false)
+  inasistencias Float?
+
+  @@index([estudianteId, cicloLectivo])
+}
+
+/** Sistema de Alertas Tempranas del GEI. */
+model AlertaTemprana {
+  id               String     @id @default(cuid())
+  estudianteId     String
+  estudiante       Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  fecha            DateTime?
+  escuela          String?
+  causas           String
+  planIntervencion String?
+  observaciones    String?
+
+  @@index([estudianteId, fecha])
 }
 
 model IncidenteConvivencia {

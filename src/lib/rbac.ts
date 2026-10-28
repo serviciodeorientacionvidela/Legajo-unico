@@ -6,6 +6,7 @@
  * |-------------------------------------------|------------|--------------------|-----------------------------------|
  * | Datos biográficos y curso                 | Lectura    | Lectura / Edición  | Control total                     |
  * | Contacto familiar (domicilio, tutores)    | Sin acceso | Lectura            | Control total                     |
+ * | Trayectoria escolar y alertas tempranas   | Sin acceso | Lectura            | Control total                     |
  * | Calificaciones, promedios y asistencias   | Lectura    | Lectura            | Control total                     |
  * | Indicador CUD / PPI                       | Solo Sí/No | Solo Sí/No         | Diagnóstico y PDF                 |
  * | Régimen de convivencia                    | Sin acceso | Carga y lectura    | Aprobación, quita de puntos, baja |
@@ -32,6 +33,7 @@ import type {
 export const PERMISOS = {
   EDITAR_DATOS_BIOGRAFICOS: ["DIRECTIVO_SOE", "PRECEPTOR"],
   VER_DATOS_CONTACTO: ["DIRECTIVO_SOE", "PRECEPTOR"],
+  VER_TRAYECTORIA: ["DIRECTIVO_SOE", "PRECEPTOR"],
   EDITAR_CALIFICACIONES: ["DIRECTIVO_SOE"],
   VER_CONVIVENCIA: ["DIRECTIVO_SOE", "PRECEPTOR"],
   CARGAR_INCIDENTE: ["DIRECTIVO_SOE", "PRECEPTOR"],
@@ -108,6 +110,7 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
   const verConvivencia = tienePermiso(rol, "VER_CONVIVENCIA");
   const verConfidencial = tienePermiso(rol, "VER_DATOS_CONFIDENCIALES");
   const verContacto = tienePermiso(rol, "VER_DATOS_CONTACTO");
+  const verTrayectoria = tienePermiso(rol, "VER_TRAYECTORIA");
 
   const intervencionesOrdenadas = [...legajo.intervenciones].sort(
     (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
@@ -155,6 +158,39 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
           telefonosFamiliares: legajo.telefonosFamiliares,
           emailsFamiliares: legajo.emailsFamiliares,
           emailContacto: legajo.emailContacto,
+        }
+      : null,
+    trayectoria: verTrayectoria
+      ? {
+          ciclos: legajo.trayectoria
+            .map((t) => ({
+              id: t.id,
+              cicloLectivo: t.cicloLectivo,
+              condicion: t.condicion,
+              escuela: t.escuela,
+              division: t.division,
+              fechaIngreso: isoONull(t.fechaIngreso),
+              motivoIngreso: t.motivoIngreso,
+              fechaEgreso: isoONull(t.fechaEgreso),
+              motivoEgreso: t.motivoEgreso,
+              activo: t.activo,
+              inasistencias: t.inasistencias,
+            }))
+            .sort(
+              (a, b) =>
+                b.cicloLectivo - a.cicloLectivo ||
+                new Date(b.fechaIngreso ?? 0).getTime() - new Date(a.fechaIngreso ?? 0).getTime(),
+            ),
+          alertas: legajo.alertas
+            .map((a) => ({
+              id: a.id,
+              fecha: isoONull(a.fecha),
+              escuela: a.escuela,
+              causas: a.causas,
+              planIntervencion: a.planIntervencion,
+              observaciones: a.observaciones,
+            }))
+            .sort((a, b) => new Date(b.fecha ?? 0).getTime() - new Date(a.fecha ?? 0).getTime()),
         }
       : null,
     convivencia: verConvivencia

@@ -33,6 +33,7 @@ Sin `.env.local`, el dashboard arranca en **modo demostración** con 18 legajos 
 |---|---|---|---|
 | Datos biográficos y curso | Lectura | Lectura / Edición | Control total |
 | Contacto familiar (domicilio, tutores, teléfonos, emails) | Sin acceso | Lectura | Control total |
+| Trayectoria escolar y alertas tempranas (GEI) | Sin acceso | Lectura | Control total |
 | Calificaciones, promedios y asistencias | Lectura | Lectura | Control total |
 | Indicador CUD / PPI | Solo Sí/No | Solo Sí/No | Diagnóstico y PDF |
 | Régimen de convivencia | Sin acceso | Carga e incidentes (quedan pendientes) | Aprobación, quita de puntos y baja |
