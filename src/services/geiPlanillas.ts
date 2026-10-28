@@ -163,7 +163,10 @@ export function analizarPlanillaEvaluaciones(datos: ArrayBuffer | Uint8Array, ar
   return { anio, division, materia, notas };
 }
 
-/** Clave de cruce por nombre: "BEJARANO MAMANI, JANET RUTH" ≡ apellidos + nombres sin tildes ni signos. */
+/**
+ * Clave de cruce por nombre: "BEJARANO MAMANI, JANET RUTH" ≡ apellidos + nombres sin tildes ni signos.
+ * Descarta las aclaraciones entre paréntesis que agrega el GEI, como "(Condicional)".
+ */
 export function claveNombre(apellidosYNombres: string): string {
-  return normalizarTexto(apellidosYNombres.replace(",", " "));
+  return normalizarTexto(apellidosYNombres.replace(/\([^)]*\)/g, " ").replace(",", " "));
 }
