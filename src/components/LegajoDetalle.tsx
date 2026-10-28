@@ -9,6 +9,7 @@ import {
   FolderOpen,
   HeartPulse,
   Loader2,
+  Phone,
   Plus,
   ShieldAlert,
   Trash2,
@@ -331,12 +332,39 @@ export default function LegajoDetalle({
                     etiqueta="Nacimiento"
                     valor={`${formatearFecha(e.fechaNacimiento)}${edad(e.fechaNacimiento) !== null ? ` (${edad(e.fechaNacimiento)} años)` : ""}`}
                   />
+                  <Dato etiqueta="Género" valor={e.genero ?? "—"} />
                   <Dato etiqueta="Curso" valor={`${etiquetaCurso(e.anio, e.division)} · ${e.turno}`} />
                   <Dato etiqueta="Promedio general" valor={formatearNota(e.promedioGeneral)} />
                   <Dato etiqueta="Asistencia" valor={`${e.porcentajeAsistencia.toLocaleString("es-AR")}%`} />
                   <Dato etiqueta="Última actualización" valor={formatearFecha(e.updatedAt)} />
                 </dl>
               </Seccion>
+
+              {legajo.contacto && (
+                <Seccion titulo="Contacto familiar" icono={<Phone className="h-4 w-4 text-slate-500" aria-hidden />}>
+                  <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Dato
+                      etiqueta="Domicilio"
+                      valor={
+                        [legajo.contacto.direccion, legajo.contacto.localidad].filter(Boolean).join(" · ") || "—"
+                      }
+                    />
+                    <Dato etiqueta="Email de contacto" valor={legajo.contacto.emailContacto ?? "—"} />
+                    <Dato
+                      etiqueta="Madre / Padre / Tutor"
+                      valor={<span className="whitespace-pre-line">{legajo.contacto.familiares ?? "—"}</span>}
+                    />
+                    <Dato
+                      etiqueta="Teléfonos"
+                      valor={<span className="whitespace-pre-line tabular-nums">{legajo.contacto.telefonosFamiliares ?? "—"}</span>}
+                    />
+                    <Dato
+                      etiqueta="Emails de familiares"
+                      valor={<span className="whitespace-pre-line break-all">{legajo.contacto.emailsFamiliares ?? "—"}</span>}
+                    />
+                  </dl>
+                </Seccion>
+              )}
 
               <Seccion titulo="Calificaciones" icono={<BookOpen className="h-4 w-4 text-slate-500" aria-hidden />}>
                 {legajo.calificaciones.length === 0 ? (

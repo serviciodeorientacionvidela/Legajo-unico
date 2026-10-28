@@ -349,15 +349,33 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
           estadoMatricula: m.estadoMatricula,
           updatedAt: ahora,
         };
+        const contacto = {
+          genero: m.genero,
+          direccion: m.direccion,
+          localidad: m.localidad,
+          familiares: m.familiares,
+          telefonosFamiliares: m.telefonosFamiliares,
+          emailsFamiliares: m.emailsFamiliares,
+          emailContacto: m.emailContacto,
+        };
+        // Igual que en el servidor: un campo ausente en el reporte no pisa lo ya cargado.
+        const contactoPresente = Object.fromEntries(Object.entries(contacto).filter(([, v]) => v !== undefined));
         if (existente) {
           if (existente.anio !== m.anio || existente.division !== m.division) resultado.carpetasDriveMovidas++;
-          Object.assign(existente, datos);
+          Object.assign(existente, datos, contactoPresente);
           resultado.estudiantesActualizados++;
         } else {
           almacenDemo.legajos.push({
             id: `demo-${m.dni}`,
             dni: m.dni,
             ...datos,
+            genero: contacto.genero ?? null,
+            direccion: contacto.direccion ?? null,
+            localidad: contacto.localidad ?? null,
+            familiares: contacto.familiares ?? null,
+            telefonosFamiliares: contacto.telefonosFamiliares ?? null,
+            emailsFamiliares: contacto.emailsFamiliares ?? null,
+            emailContacto: contacto.emailContacto ?? null,
             promedioGeneral: 0,
             porcentajeAsistencia: 100,
             puntosConvivencia: PUNTOS_INICIALES,

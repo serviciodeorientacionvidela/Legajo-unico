@@ -57,6 +57,7 @@ model Estudiante {
   apellidos            String
   nombres              String
   fechaNacimiento      DateTime?
+  genero               String?
   anio                 Int // 1 a 5 (validado en la capa de aplicación)
   division             String
   turno                String
@@ -66,6 +67,14 @@ model Estudiante {
   tieneCud             Boolean   @default(false)
   vencimientoCud       DateTime?
   requierePpi          Boolean   @default(false)
+
+  // --- Contacto familiar (GEI): solo PRECEPTOR y DIRECTIVO_SOE. Multilínea: un renglón por familiar ---
+  direccion           String?
+  localidad           String?
+  familiares          String?
+  telefonosFamiliares String?
+  emailsFamiliares    String?
+  emailContacto       String?
 
   // --- Datos sensibles: solo nivel 3 (DIRECTIVO_SOE) ---
   diagnosticoReservado        String?

@@ -5,6 +5,7 @@
  * | Módulo                                    | Docente    | Preceptor          | Directivo / SOE                   |
  * |-------------------------------------------|------------|--------------------|-----------------------------------|
  * | Datos biográficos y curso                 | Lectura    | Lectura / Edición  | Control total                     |
+ * | Contacto familiar (domicilio, tutores)    | Sin acceso | Lectura            | Control total                     |
  * | Calificaciones, promedios y asistencias   | Lectura    | Lectura            | Control total                     |
  * | Indicador CUD / PPI                       | Solo Sí/No | Solo Sí/No         | Diagnóstico y PDF                 |
  * | Régimen de convivencia                    | Sin acceso | Carga y lectura    | Aprobación, quita de puntos, baja |
@@ -30,6 +31,7 @@ import type {
 
 export const PERMISOS = {
   EDITAR_DATOS_BIOGRAFICOS: ["DIRECTIVO_SOE", "PRECEPTOR"],
+  VER_DATOS_CONTACTO: ["DIRECTIVO_SOE", "PRECEPTOR"],
   EDITAR_CALIFICACIONES: ["DIRECTIVO_SOE"],
   VER_CONVIVENCIA: ["DIRECTIVO_SOE", "PRECEPTOR"],
   CARGAR_INCIDENTE: ["DIRECTIVO_SOE", "PRECEPTOR"],
@@ -105,6 +107,7 @@ export function resumirEstudiante(
 export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
   const verConvivencia = tienePermiso(rol, "VER_CONVIVENCIA");
   const verConfidencial = tienePermiso(rol, "VER_DATOS_CONFIDENCIALES");
+  const verContacto = tienePermiso(rol, "VER_DATOS_CONTACTO");
 
   const intervencionesOrdenadas = [...legajo.intervenciones].sort(
     (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
@@ -122,6 +125,7 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
       apellidos: legajo.apellidos,
       nombres: legajo.nombres,
       fechaNacimiento: isoONull(legajo.fechaNacimiento),
+      genero: legajo.genero,
       anio: legajo.anio,
       division: legajo.division,
       turno: legajo.turno,
@@ -143,6 +147,16 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
         previa: c.previa,
       }))
       .sort((a, b) => b.cicloLectivo - a.cicloLectivo || a.materia.localeCompare(b.materia, "es")),
+    contacto: verContacto
+      ? {
+          direccion: legajo.direccion,
+          localidad: legajo.localidad,
+          familiares: legajo.familiares,
+          telefonosFamiliares: legajo.telefonosFamiliares,
+          emailsFamiliares: legajo.emailsFamiliares,
+          emailContacto: legajo.emailContacto,
+        }
+      : null,
     convivencia: verConvivencia
       ? {
           puntos: legajo.puntosConvivencia,

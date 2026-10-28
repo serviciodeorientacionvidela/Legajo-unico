@@ -29,6 +29,14 @@ export interface MatriculaGei {
   division: string;
   turno: string;
   estadoMatricula: EstadoMatricula;
+  /** Campos opcionales: undefined si el reporte no trae la columna (no se pisa lo ya cargado). */
+  genero?: string | null;
+  direccion?: string | null;
+  localidad?: string | null;
+  familiares?: string | null;
+  telefonosFamiliares?: string | null;
+  emailsFamiliares?: string | null;
+  emailContacto?: string | null;
 }
 
 export interface AsistenciaGei {
@@ -91,7 +99,14 @@ type CampoGei =
   | "primerCuatrimestre"
   | "segundoCuatrimestre"
   | "notaFinal"
-  | "previa";
+  | "previa"
+  | "genero"
+  | "direccion"
+  | "localidad"
+  | "familiares"
+  | "telefonosFamiliares"
+  | "emailsFamiliares"
+  | "emailContacto";
 
 const ALIAS_COLUMNAS: Record<CampoGei, string[]> = {
   dni: ["dni", "documento", "nro documento", "n documento", "numero documento", "numero de documento", "nro de documento", "doc", "dni alumno", "dni estudiante"],
@@ -112,6 +127,13 @@ const ALIAS_COLUMNAS: Record<CampoGei, string[]> = {
   segundoCuatrimestre: ["2do cuatrimestre", "2 cuatrimestre", "segundo cuatrimestre", "2c", "cuatrimestre 2", "2 cuat", "2do cuat"],
   notaFinal: ["nota final", "final", "calificacion final", "definitiva", "nota definitiva", "promedio final", "calificacion definitiva"],
   previa: ["previa", "adeuda", "materia previa", "condicion"],
+  genero: ["genero", "sexo"],
+  direccion: ["direccion", "domicilio"],
+  localidad: ["localidad departamento", "localidad", "localidad y departamento"],
+  familiares: ["madre padre tutor", "tutor", "tutores", "responsable", "responsables", "madre padre"],
+  telefonosFamiliares: ["telefono familiares", "telefonos familiares", "telefono", "telefonos", "telefono tutor"],
+  emailsFamiliares: ["email familiares", "emails familiares", "mail familiares", "correo familiares"],
+  emailContacto: ["email contacto", "mail contacto", "email", "correo electronico"],
 };
 
 export function normalizarTexto(valor: string): string {
@@ -192,7 +214,7 @@ export function parsearDivision(valor: unknown): string | null {
 }
 
 /** "1° 2da", "1-2", "1ro 2da" → { anio: 1, division: "2" } */
-function parsearCursoCombinado(valor: unknown): { anio: number; division: string } | null {
+export function parsearCursoCombinado(valor: unknown): { anio: number; division: string } | null {
   const [anio, division] = numerosEn(valor);
   if (anio === undefined || division === undefined || anio < 1 || anio > 5) return null;
   return { anio, division: String(division) };
@@ -267,6 +289,18 @@ function separarApellidoYNombre(valor: unknown): { apellidos: string; nombres: s
 function celda(fila: unknown[], mapa: MapaColumnas, campo: CampoGei): unknown {
   const indice = mapa[campo];
   return indice === undefined ? undefined : fila[indice];
+}
+
+/** Texto libre conservando un renglón por familiar. undefined si la columna no existe. */
+function textoOpcional(fila: unknown[], mapa: MapaColumnas, campo: CampoGei): string | null | undefined {
+  if (mapa[campo] === undefined) return undefined;
+  const valor = celda(fila, mapa, campo);
+  if (valor === null || valor === undefined) return null;
+  const renglones = String(valor)
+    .split(/\r?\n/)
+    .map((r) => texto(r))
+    .filter(Boolean);
+  return renglones.length > 0 ? renglones.join("\n") : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +378,13 @@ export function analizarLibroGei(datos: ArrayBuffer | Uint8Array, cicloPorDefect
           division,
           turno: texto(celda(fila, mapa, "turno")) || "Mañana",
           estadoMatricula: mapa.estado !== undefined ? parsearEstado(celda(fila, mapa, "estado")) : "REGULAR",
+          genero: textoOpcional(fila, mapa, "genero"),
+          direccion: textoOpcional(fila, mapa, "direccion"),
+          localidad: textoOpcional(fila, mapa, "localidad"),
+          familiares: textoOpcional(fila, mapa, "familiares"),
+          telefonosFamiliares: textoOpcional(fila, mapa, "telefonosFamiliares"),
+          emailsFamiliares: textoOpcional(fila, mapa, "emailsFamiliares"),
+          emailContacto: textoOpcional(fila, mapa, "emailContacto"),
         });
       }
 

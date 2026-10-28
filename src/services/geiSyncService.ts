@@ -10,8 +10,15 @@ import {
   analizarLibroGei,
   calcularPromedio,
   deduplicarPorDni,
+  type CalificacionGei,
   type ResultadoImportacionGei,
 } from "./geiParser";
+import {
+  analizarAsistenciaMensual,
+  analizarPlanillaEvaluaciones,
+  claveNombre,
+  consolidarAsistencia,
+} from "./geiPlanillas";
 import {
   driveConfigurado,
   moverCarpetaPorPromocion,
@@ -27,6 +34,8 @@ export interface OpcionesImportacionGei {
   cicloLectivo?: number;
   sincronizarDrive?: boolean;
   ipAddress?: string | null;
+  /** Si se indica, solo se importa la matrícula de estos años (p. ej. [1, 2, 3]). */
+  anios?: number[];
 }
 
 const TAMANO_LOTE = 100;
@@ -47,6 +56,150 @@ async function conConcurrencia<T>(items: T[], limite: number, tarea: (item: T) =
     }
   });
   await Promise.all(trabajadores);
+}
+
+/** Upsert de notas por (estudiante, materia, ciclo) y recálculo del promedio general del ciclo. */
+async function guardarCalificaciones(
+  calificaciones: (CalificacionGei & { estudianteId: string })[],
+  ciclo: number,
+): Promise<number> {
+  for (const lote of enLotes(calificaciones, TAMANO_LOTE)) {
+    await prisma.$transaction(
+      lote.map((c) => {
+        const notas = {
+          primerCuatrimestre: c.primerCuatrimestre,
+          segundoCuatrimestre: c.segundoCuatrimestre,
+          notaFinal: c.notaFinal,
+          previa: c.previa,
+        };
+        return prisma.calificacionMateria.upsert({
+          where: {
+            estudianteId_materia_cicloLectivo: {
+              estudianteId: c.estudianteId,
+              materia: c.materia,
+              cicloLectivo: c.cicloLectivo,
+            },
+          },
+          create: { estudianteId: c.estudianteId, materia: c.materia, cicloLectivo: c.cicloLectivo, ...notas },
+          update: notas,
+        });
+      }),
+    );
+  }
+
+  const idsAfectados = [...new Set(calificaciones.map((c) => c.estudianteId))];
+  for (const lote of enLotes(idsAfectados, TAMANO_LOTE)) {
+    const notas = await prisma.calificacionMateria.findMany({
+      where: { estudianteId: { in: lote }, cicloLectivo: ciclo },
+      select: { estudianteId: true, primerCuatrimestre: true, segundoCuatrimestre: true, notaFinal: true },
+    });
+    const operaciones = lote.flatMap((id) => {
+      const promedio = calcularPromedio(notas.filter((n) => n.estudianteId === id));
+      return promedio === null ? [] : [prisma.estudiante.update({ where: { id }, data: { promedioGeneral: promedio } })];
+    });
+    if (operaciones.length > 0) await prisma.$transaction(operaciones);
+  }
+  return calificaciones.length;
+}
+
+export interface PlanillasGei {
+  /** Resúmenes mensuales de asistencia (solo meses cerrados), uno por división y mes. */
+  asistencias: { nombre: string; datos: Uint8Array }[];
+  /** Resúmenes de evaluaciones, uno por espacio curricular de cada división. */
+  evaluaciones: { nombre: string; datos: Uint8Array }[];
+}
+
+export interface ResultadoPlanillasGei {
+  asistenciasActualizadas: number;
+  calificacionesActualizadas: number;
+  /** Alumnos de las planillas de notas que no se pudieron cruzar por nombre con la matrícula. */
+  sinCruzar: { curso: string; materia: string; nombre: string }[];
+  errores: string[];
+  duracionMs: number;
+}
+
+/**
+ * Importa las planillas por división que descarga el scraper: asistencia anual (sumando meses
+ * cerrados) por DNI y notas por espacio curricular, cruzadas por nombre dentro de la división.
+ * Requiere que la matrícula ya esté importada.
+ */
+export async function importarPlanillasGei(
+  planillas: PlanillasGei,
+  opciones: { usuarioId: string; cicloLectivo?: number; ipAddress?: string | null },
+): Promise<ResultadoPlanillasGei> {
+  const inicio = Date.now();
+  const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
+  const resultado: ResultadoPlanillasGei = {
+    asistenciasActualizadas: 0,
+    calificacionesActualizadas: 0,
+    sinCruzar: [],
+    errores: [],
+    duracionMs: 0,
+  };
+
+  // --- Asistencia anual ----------------------------------------------------
+  const meses = planillas.asistencias.flatMap((a) => {
+    try {
+      return [analizarAsistenciaMensual(a.datos, a.nombre)];
+    } catch (error) {
+      resultado.errores.push((error as Error).message);
+      return [];
+    }
+  });
+  for (const lote of enLotes(consolidarAsistencia(meses), TAMANO_LOTE)) {
+    const actualizaciones = await prisma.$transaction(
+      lote.map((a) =>
+        prisma.estudiante.updateMany({ where: { dni: a.dni }, data: { porcentajeAsistencia: a.porcentajeAsistencia } }),
+      ),
+    );
+    resultado.asistenciasActualizadas += actualizaciones.filter((r) => r.count > 0).length;
+  }
+
+  // --- Notas: cruce por nombre dentro de la división -----------------------
+  const planillasNotas = planillas.evaluaciones.flatMap((p) => {
+    try {
+      return [analizarPlanillaEvaluaciones(p.datos, p.nombre)];
+    } catch (error) {
+      resultado.errores.push((error as Error).message);
+      return [];
+    }
+  });
+  const alumnos = await prisma.estudiante.findMany({
+    where: { estadoMatricula: "REGULAR" },
+    select: { id: true, apellidos: true, nombres: true, anio: true, division: true },
+  });
+  const idPorCursoYNombre = new Map(
+    alumnos.map((e) => [`${e.anio}-${e.division}|${claveNombre(`${e.apellidos} ${e.nombres}`)}`, e.id]),
+  );
+
+  const calificaciones = planillasNotas.flatMap((planilla) =>
+    planilla.notas.flatMap((n) => {
+      const estudianteId = idPorCursoYNombre.get(`${planilla.anio}-${planilla.division}|${claveNombre(n.nombre)}`);
+      if (!estudianteId) {
+        resultado.sinCruzar.push({ curso: `${planilla.anio}° ${planilla.division}ª`, materia: planilla.materia, nombre: n.nombre });
+        return [];
+      }
+      // Sin ninguna nota cargada todavía no se crea el registro.
+      if (n.primerPeriodo === null && n.segundoPeriodo === null && n.notaFinal === null) return [];
+      return [
+        {
+          estudianteId,
+          dni: "",
+          materia: planilla.materia,
+          cicloLectivo: ciclo,
+          primerCuatrimestre: n.primerPeriodo,
+          segundoCuatrimestre: n.segundoPeriodo,
+          notaFinal: n.notaFinal,
+          previa: false,
+        },
+      ];
+    }),
+  );
+  resultado.calificacionesActualizadas = await guardarCalificaciones(calificaciones, ciclo);
+
+  await registrarAuditoria(opciones.usuarioId, null, "IMPORTAR_GEI", opciones.ipAddress ?? null);
+  resultado.duracionMs = Date.now() - inicio;
+  return resultado;
 }
 
 /**
@@ -82,7 +235,9 @@ export async function importarArchivoGei(
   }
 
   // --- 1. Matrícula: upsert masivo por DNI ---------------------------------
-  const matricula = deduplicarPorDni(analisis.matricula);
+  const matricula = deduplicarPorDni(analisis.matricula).filter(
+    (m) => !opciones.anios || opciones.anios.includes(m.anio),
+  );
   const promociones = new Set<string>();
 
   for (const lote of enLotes(matricula, TAMANO_LOTE)) {
@@ -103,6 +258,14 @@ export async function importarArchivoGei(
           division: m.division,
           turno: m.turno,
           estadoMatricula: m.estadoMatricula,
+          // undefined (columna ausente en el reporte) => Prisma no toca el valor guardado.
+          genero: m.genero,
+          direccion: m.direccion,
+          localidad: m.localidad,
+          familiares: m.familiares,
+          telefonosFamiliares: m.telefonosFamiliares,
+          emailsFamiliares: m.emailsFamiliares,
+          emailContacto: m.emailContacto,
         };
         return prisma.estudiante.upsert({
           where: { dni: m.dni },
@@ -154,44 +317,7 @@ export async function importarArchivoGei(
     const estudianteId = idsPorDni.get(c.dni);
     return estudianteId ? [{ ...c, estudianteId }] : [];
   });
-  for (const lote of enLotes(calificacionesValidas, TAMANO_LOTE)) {
-    await prisma.$transaction(
-      lote.map((c) => {
-        const notas = {
-          primerCuatrimestre: c.primerCuatrimestre,
-          segundoCuatrimestre: c.segundoCuatrimestre,
-          notaFinal: c.notaFinal,
-          previa: c.previa,
-        };
-        return prisma.calificacionMateria.upsert({
-          where: {
-            estudianteId_materia_cicloLectivo: {
-              estudianteId: c.estudianteId,
-              materia: c.materia,
-              cicloLectivo: c.cicloLectivo,
-            },
-          },
-          create: { estudianteId: c.estudianteId, materia: c.materia, cicloLectivo: c.cicloLectivo, ...notas },
-          update: notas,
-        });
-      }),
-    );
-    resultado.calificacionesActualizadas += lote.length;
-  }
-
-  // Recalcular el promedio general del ciclo para los alumnos con notas nuevas.
-  const idsAfectados = [...new Set(calificacionesValidas.map((c) => c.estudianteId))];
-  for (const lote of enLotes(idsAfectados, TAMANO_LOTE)) {
-    const notas = await prisma.calificacionMateria.findMany({
-      where: { estudianteId: { in: lote }, cicloLectivo: ciclo },
-      select: { estudianteId: true, primerCuatrimestre: true, segundoCuatrimestre: true, notaFinal: true },
-    });
-    const operaciones = lote.flatMap((id) => {
-      const promedio = calcularPromedio(notas.filter((n) => n.estudianteId === id));
-      return promedio === null ? [] : [prisma.estudiante.update({ where: { id }, data: { promedioGeneral: promedio } })];
-    });
-    if (operaciones.length > 0) await prisma.$transaction(operaciones);
-  }
+  resultado.calificacionesActualizadas += await guardarCalificaciones(calificacionesValidas, ciclo);
 
   // --- 4. Google Drive -----------------------------------------------------
   const sincronizar = opciones.sincronizarDrive ?? true;

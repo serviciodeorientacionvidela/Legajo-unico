@@ -36,12 +36,19 @@ export interface EstudianteFuente {
   apellidos: string;
   nombres: string;
   fechaNacimiento: Fecha | null;
+  genero: string | null;
   anio: number;
   division: string;
   turno: string;
   promedioGeneral: number;
   porcentajeAsistencia: number;
   puntosConvivencia: number;
+  direccion: string | null;
+  localidad: string | null;
+  familiares: string | null;
+  telefonosFamiliares: string | null;
+  emailsFamiliares: string | null;
+  emailContacto: string | null;
   tieneCud: boolean;
   vencimientoCud: Fecha | null;
   requierePpi: boolean;
@@ -169,6 +176,7 @@ export interface LegajoVisible {
     apellidos: string;
     nombres: string;
     fechaNacimiento: string | null;
+    genero: string | null;
     anio: number;
     division: string;
     turno: string;
@@ -180,6 +188,15 @@ export interface LegajoVisible {
     updatedAt: string;
   };
   calificaciones: CalificacionVisible[];
+  /** Datos de contacto familiar. null para DOCENTE. */
+  contacto: {
+    direccion: string | null;
+    localidad: string | null;
+    familiares: string | null;
+    telefonosFamiliares: string | null;
+    emailsFamiliares: string | null;
+    emailContacto: string | null;
+  } | null;
   /** null para DOCENTE (sin acceso al régimen de convivencia). */
   convivencia: { puntos: number; incidentes: IncidenteVisible[] } | null;
   /** Acuerdos pedagógicos del SOE, redactados sin datos clínicos. Visibles para todos los roles. */
