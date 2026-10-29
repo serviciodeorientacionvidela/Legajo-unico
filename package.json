@@ -14,7 +14,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "usuario:crear": "tsx scripts/crear-usuario.ts",
-    "gei:scrape": "tsx scripts/gei-scraper.ts"
+    "gei:scrape": "tsx scripts/gei-scraper.ts",
+    "deploy": "npx --yes vercel@65.5.0 --prod"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

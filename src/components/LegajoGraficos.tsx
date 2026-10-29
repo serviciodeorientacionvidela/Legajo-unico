@@ -13,7 +13,7 @@ import { formatearNota } from "@/lib/formato";
 import { UMBRAL_ASISTENCIA_RIESGO, UMBRAL_PROMEDIO_BAJO } from "@/lib/rbac";
 import type { AsistenciaMensualVisible, CalificacionVisible, LegajoVisible } from "@/lib/types";
 
-const COLOR_SERIE = "#1f57b3"; // institucional-600
+const COLOR_SERIE = "#0b7b83"; // institucional-600
 const COLOR_RIESGO = "#b91c1c"; // red-700
 
 /** Nota que resume una materia: la final si existe, si no el último período cerrado. */

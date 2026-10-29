@@ -50,24 +50,24 @@ export function Modal({ abierto, titulo, subtitulo, onCerrar, children, ancho = 
   const anchos = { md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-institucional-950/50 p-4 backdrop-blur-sm sm:items-center">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={idTitulo}
-        className={`relative w-full ${anchos[ancho]} rounded-xl bg-white shadow-xl`}
+        className={`relative w-full ${anchos[ancho]} overflow-hidden rounded-2xl bg-white shadow-2xl`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 bg-institucional-950 px-5 py-4">
           <div>
-            <h2 id={idTitulo} className="text-base font-semibold text-slate-900">
+            <h2 id={idTitulo} className="text-base font-bold text-white">
               {titulo}
             </h2>
-            {subtitulo && <p className="mt-0.5 text-sm text-slate-500">{subtitulo}</p>}
+            {subtitulo && <p className="mt-0.5 text-sm text-institucional-200">{subtitulo}</p>}
           </div>
           <button
             type="button"
             onClick={onCerrar}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-full p-1 text-institucional-200 hover:bg-institucional-900 hover:text-white"
             aria-label="Cerrar"
           >
             <X className="h-5 w-5" />
@@ -91,26 +91,26 @@ export function Seccion({
   accion?: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
-      <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+    <section className="tarjeta">
+      <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
+        <h3 className="flex items-center gap-2 text-sm font-bold text-institucional-950">
           {icono}
           {titulo}
         </h3>
         {accion}
       </header>
-      <div className="px-4 py-3">{children}</div>
+      <div className="px-5 py-4">{children}</div>
     </section>
   );
 }
 
 export function MensajeError({ mensaje }: { mensaje: string }) {
-  return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">{mensaje}</p>;
+  return <p className="rounded-2xl bg-red-50 px-4 py-2.5 text-sm text-red-700 ring-1 ring-inset ring-red-200">{mensaje}</p>;
 }
 
 export function Bloqueado({ texto }: { texto: string }) {
   return (
-    <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+    <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
       🔒 {texto}
     </p>
   );

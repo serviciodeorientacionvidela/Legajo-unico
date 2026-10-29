@@ -18,7 +18,7 @@ interface Props {
 
 function BarraPuntos({ puntos }: { puntos: number }) {
   const nivel = nivelAlertaPuntos(puntos);
-  const colores = { ok: "bg-emerald-500", atencion: "bg-amber-500", critico: "bg-red-500" };
+  const colores = { ok: "bg-institucional-500", atencion: "bg-amber-500", critico: "bg-red-500" };
   return (
     <div className="flex items-center gap-2" title={`${puntos} de ${PUNTOS_INICIALES} puntos`}>
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200">
@@ -32,17 +32,17 @@ function BarraPuntos({ puntos }: { puntos: number }) {
 export default function StudentTable({ estudiantes, total, cargando, mostrarPuntos, onVerLegajo, onCargarMas }: Props) {
   if (!cargando && estudiantes.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
         No hay estudiantes que coincidan con la búsqueda o los filtros.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="tarjeta overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-institucional-950 text-left text-xs font-semibold uppercase tracking-wide text-institucional-100">
             <tr>
               <th scope="col" className="px-4 py-3">Estudiante</th>
               <th scope="col" className="px-4 py-3">Curso</th>
@@ -61,7 +61,7 @@ export default function StudentTable({ estudiantes, total, cargando, mostrarPunt
                 onClick={() => onVerLegajo(e.dni)}
               >
                 <td className="px-4 py-3">
-                  <div className="font-medium text-slate-900">
+                  <div className="font-semibold text-institucional-950">
                     {e.apellidos}, {e.nombres}
                   </div>
                   <div className="text-xs tabular-nums text-slate-500">DNI {e.dni}</div>
@@ -102,7 +102,7 @@ export default function StudentTable({ estudiantes, total, cargando, mostrarPunt
                       ev.stopPropagation();
                       onVerLegajo(e.dni);
                     }}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-institucional-700 hover:bg-institucional-50"
+                    className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-institucional-700 ring-1 ring-inset ring-institucional-200 hover:bg-institucional-50"
                   >
                     Legajo <ChevronRight className="h-4 w-4" aria-hidden />
                   </button>

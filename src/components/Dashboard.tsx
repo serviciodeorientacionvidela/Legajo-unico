@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -93,17 +94,14 @@ function useDiferido<T>(valor: T, demoraMs: number): T {
   return diferido;
 }
 
-const CLASE_SELECT =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-institucional-500 focus:outline-none focus:ring-1 focus:ring-institucional-500";
-
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition ${
-        activo ? "bg-institucional-600 text-white ring-institucional-600" : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-50"
+      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition ${
+        activo ? "bg-institucional-600 text-white ring-institucional-600" : "bg-white text-slate-600 ring-slate-200 hover:bg-institucional-50"
       }`}
     >
       {children}
@@ -366,8 +364,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
 
   if (sesionCerrada) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
-        <div className="w-full max-w-sm rounded-xl bg-white p-8 text-center shadow">
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="tarjeta w-full max-w-sm p-8 text-center">
           <ShieldCheck className="mx-auto h-10 w-10 text-institucional-600" aria-hidden />
           <h1 className="mt-3 text-lg font-semibold text-slate-900">Sesión cerrada por inactividad</h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -376,7 +374,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           <button
             type="button"
             onClick={() => setSesionCerrada(false)}
-            className="mt-6 w-full rounded-lg bg-institucional-600 px-4 py-2 text-sm font-medium text-white hover:bg-institucional-700"
+            className="boton-primario mt-6 w-full"
           >
             Volver a ingresar
           </button>
@@ -393,20 +391,81 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       }
     : null;
 
+  const iniciales = usuario.nombre
+    .replace(/^(Lic|Prof|Dr|Dra)\.\s*/i, "")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
+
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <div className="min-h-screen lg:pl-64">
+      {/* --- Menú lateral (petróleo) ------------------------------------------------ */}
+      <aside className="flex flex-col bg-institucional-950 text-slate-300 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64">
+        <div className="flex items-center gap-3 px-5 py-5 lg:flex-col lg:py-8 lg:text-center">
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-institucional-900 ring-2 ring-institucional-400 lg:h-20 lg:w-20 lg:ring-4">
+            <GraduationCap className="h-6 w-6 text-institucional-300 lg:h-9 lg:w-9" aria-hidden />
+          </span>
+          <div>
+            <h1 className="text-base font-bold leading-tight text-white">Legajo Único</h1>
+            <p className="text-xs text-institucional-200">del Estudiante · Ciclo 2026</p>
+          </div>
+        </div>
+
+        <nav aria-label="Secciones" className="space-y-1 px-3">
+          <span className="flex items-center gap-3 rounded-full bg-institucional-600 px-4 py-2.5 text-sm font-semibold text-white" aria-current="page">
+            <Users className="h-4 w-4" aria-hidden /> Estudiantes
+          </span>
+          {tienePermiso(rol, "IMPORTAR_GEI") && (
+            <button
+              type="button"
+              onClick={() => setModalImportar(true)}
+              className="flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-institucional-900 hover:text-white"
+            >
+              <FileSpreadsheet className="h-4 w-4" aria-hidden /> Importar GEI
+            </button>
+          )}
+          {tienePermiso(rol, "VER_AUDITORIA") && (
+            <button
+              type="button"
+              onClick={() => setModalAuditoria(true)}
+              className="flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-institucional-900 hover:text-white"
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden /> Auditoría
+            </button>
+          )}
+        </nav>
+
+        <div className="mt-auto hidden space-y-3 border-t border-institucional-900 px-5 py-5 lg:block">
           <div className="flex items-center gap-3">
-            <span className="rounded-lg bg-institucional-600 p-2 text-white">
-              <GraduationCap className="h-6 w-6" aria-hidden />
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-institucional-800 text-xs font-bold text-institucional-100">
+              {iniciales}
             </span>
-            <div>
-              <h1 className="text-base font-semibold leading-tight text-slate-900">Legajo Único del Estudiante</h1>
-              <p className="text-xs text-slate-500">Escuela Secundaria · Mendoza · Ciclo lectivo 2026</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{usuario.nombre}</p>
+              <p className="truncate text-xs text-institucional-200">{ROL_ETIQUETA[usuario.rol]}</p>
             </div>
           </div>
+          {!modoDemo && (
+            <button
+              type="button"
+              onClick={() => void cerrarSesion()}
+              className="flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-200 ring-1 ring-inset ring-institucional-800 transition hover:bg-institucional-900"
+            >
+              <LogOut className="h-4 w-4" aria-hidden /> Cerrar sesión
+            </button>
+          )}
+        </div>
+      </aside>
 
+      {/* --- Barra superior ---------------------------------------------------------- */}
+      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-fondo/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div>
+            <h2 className="text-lg font-bold text-institucional-950">Estudiantes</h2>
+            <p className="text-xs text-slate-500">Escuela 4012 · Mendoza · Ciclo lectivo 2026</p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <SessionTimeoutGuard onTimeout={alExpirarSesion} onLatido={latido} mostrarContador={modoDemo} />
             {modoDemo ? (
@@ -420,34 +479,24 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
                     refrescar();
                     setAviso({ texto: "Datos de demostración restablecidos.", tono: "ok" });
                   }}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100"
+                  className="boton-secundario px-3 py-1.5 text-xs"
                   title="Restablecer los datos semilla"
                 >
                   <RotateCcw className="h-4 w-4" aria-hidden /> Reiniciar
                 </button>
               </>
             ) : (
-              <>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900">{usuario.nombre}</p>
-                  <p className="text-xs text-slate-500">{ROL_ETIQUETA[usuario.rol]}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void cerrarSesion()}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden /> Salir
-                </button>
-              </>
+              <button type="button" onClick={() => void cerrarSesion()} className="boton-secundario px-3 py-1.5 text-xs lg:hidden">
+                <LogOut className="h-4 w-4" aria-hidden /> Salir
+              </button>
             )}
           </div>
         </div>
       </header>
 
       {modoDemo && (
-        <div className="border-b border-amber-200 bg-amber-50">
-          <p className="mx-auto flex max-w-7xl items-start gap-2 px-4 py-2 text-xs text-amber-900 sm:px-6">
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+          <p className="flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-2.5 text-xs text-amber-900 ring-1 ring-inset ring-amber-200">
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               <strong>Modo demostración</strong> · Datos ficticios en memoria. Está viendo el sistema como{" "}
@@ -461,7 +510,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
         <MetricCards metricas={metricas} onFiltroRapido={aplicarFiltroRapido} />
 
-        <details className="group rounded-xl border border-slate-200 bg-white shadow-sm">
+        <details className="tarjeta group">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700">
             <ShieldCheck className="h-4 w-4 text-institucional-600" aria-hidden />
             Permisos de su rol: {ROL_ETIQUETA[rol]}
@@ -485,20 +534,20 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[16rem] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
               <input
                 type="search"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 placeholder="Buscar por DNI o apellido…"
                 aria-label="Buscar estudiante por DNI o apellido"
-                className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-institucional-500 focus:outline-none focus:ring-1 focus:ring-institucional-500"
+                className="campo-pildora pl-10"
               />
             </div>
             <select
               value={anio ?? ""}
               onChange={(e) => setAnio(e.target.value ? Number(e.target.value) : undefined)}
-              className={CLASE_SELECT}
+              className="campo-pildora w-auto"
               aria-label="Filtrar por año"
             >
               <option value="">Todos los años</option>
@@ -508,32 +557,14 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
                 </option>
               ))}
             </select>
-            <select value={division} onChange={(e) => setDivision(e.target.value)} className={CLASE_SELECT} aria-label="Filtrar por división">
+            <select value={division} onChange={(e) => setDivision(e.target.value)} className="campo-pildora w-auto" aria-label="Filtrar por división">
               <option value="">Todas las divisiones</option>
-              {["1", "2", "3", "4"].map((d) => (
+              {["1", "2", "3", "4", "5"].map((d) => (
                 <option key={d} value={d}>
                   {d}° división
                 </option>
               ))}
             </select>
-            {tienePermiso(rol, "IMPORTAR_GEI") && (
-              <button
-                type="button"
-                onClick={() => setModalImportar(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
-              >
-                <FileSpreadsheet className="h-4 w-4" aria-hidden /> Importar GEI
-              </button>
-            )}
-            {tienePermiso(rol, "VER_AUDITORIA") && (
-              <button
-                type="button"
-                onClick={() => setModalAuditoria(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
-              >
-                <ClipboardList className="h-4 w-4" aria-hidden /> Auditoría
-              </button>
-            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">Filtros:</span>
@@ -551,7 +582,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           </div>
 
           {errorLista ? (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">{errorLista}</p>
+            <p className="rounded-2xl bg-red-50 px-4 py-2.5 text-sm text-red-700 ring-1 ring-inset ring-red-200">{errorLista}</p>
           ) : (
             <StudentTable
               estudiantes={estudiantes}

@@ -33,17 +33,17 @@ function Tarjeta({
       type="button"
       onClick={onClick}
       disabled={bloqueada}
-      className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-institucional-500 hover:shadow disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:hover:shadow-sm"
+      className="tarjeta group flex items-start gap-4 p-5 text-left transition hover:-translate-y-0.5 hover:border-institucional-300 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:border-slate-200/70"
     >
-      <span className={`rounded-lg p-2.5 ${color}`}>{icono}</span>
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${color}`}>{icono}</span>
       <span className="min-w-0">
-        <span className="block text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</span>
+        <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{titulo}</span>
         {bloqueada ? (
           <span className="mt-1 flex items-center gap-1 text-sm font-medium text-slate-400">
             <Lock className="h-4 w-4" aria-hidden /> Sin acceso
           </span>
         ) : (
-          <span className="mt-0.5 block text-2xl font-semibold tabular-nums text-slate-900">
+          <span className="mt-0.5 block text-3xl font-bold tabular-nums text-institucional-950">
             {valor === undefined || valor === null ? "—" : valor}
           </span>
         )}
@@ -60,8 +60,8 @@ export default function MetricCards({ metricas, onFiltroRapido }: Props) {
         titulo="Matrícula total"
         valor={metricas?.matriculaTotal}
         detalle="Estudiantes regulares"
-        icono={<Users className="h-5 w-5 text-institucional-700" />}
-        color="bg-institucional-50"
+        icono={<Users className="h-5 w-5 text-white" />}
+        color="bg-institucional-600"
         onClick={() => onFiltroRapido("todos")}
       />
       <Tarjeta

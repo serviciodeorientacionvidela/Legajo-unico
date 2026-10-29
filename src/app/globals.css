@@ -7,9 +7,25 @@
 }
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply bg-fondo font-sans text-slate-900 antialiased;
 }
 
 summary::-webkit-details-marker {
   display: none;
+}
+
+@layer components {
+  /* Campos tipo píldora (búsqueda, selects, inputs de formulario). */
+  .campo-pildora {
+    @apply w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-institucional-500 focus:outline-none focus:ring-2 focus:ring-institucional-500/30;
+  }
+  .boton-primario {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-institucional-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-institucional-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-institucional-500 focus-visible:ring-offset-2 disabled:opacity-60;
+  }
+  .boton-secundario {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-institucional-800 shadow-sm ring-1 ring-inset ring-slate-200 transition hover:bg-institucional-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-institucional-500 disabled:opacity-60;
+  }
+  .tarjeta {
+    @apply rounded-2xl border border-slate-200/70 bg-white shadow-tarjeta;
+  }
 }

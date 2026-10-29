@@ -1,0 +1,22 @@
+# Lo que NO se sube al publicar con `npm run deploy` (vercel --prod desde esta compu).
+# La CLI de Vercel no lee .gitignore: estas reglas lo replican.
+
+# entorno (credenciales GEI, clave de Service Account, Neon): las variables viven en Vercel
+.env
+.env*.local
+
+# reportes descargados del GEI (datos personales de menores) y documentos internos
+gei-downloads/
+docs/
+
+# dependencias y builds locales (Vercel instala y compila de cero)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# varios
+.aider*
+playwright-report/
+test-results/
+*.log

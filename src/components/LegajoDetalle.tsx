@@ -198,22 +198,22 @@ export default function LegajoDetalle({
   const e = legajo?.estudiante;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/30" onClick={onCerrar}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-institucional-950/40 backdrop-blur-sm" onClick={onCerrar}>
       <aside
         role="dialog"
         aria-modal="true"
         aria-label="Legajo Único del Estudiante"
-        className="flex h-full w-full max-w-5xl flex-col bg-slate-50 shadow-2xl"
+        className="flex h-full w-full max-w-5xl flex-col bg-fondo shadow-2xl"
         onClick={(ev) => ev.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
+        <header className="flex items-start justify-between gap-4 bg-institucional-950 px-6 py-5">
           {e && rol ? (
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-institucional-600">Legajo Único del Estudiante</p>
-              <h2 className="truncate text-lg font-semibold text-slate-900">
+              <p className="text-xs font-semibold uppercase tracking-wider text-institucional-300">Legajo Único del Estudiante</p>
+              <h2 className="truncate text-xl font-bold text-white">
                 {e.apellidos}, {e.nombres}
               </h2>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm text-institucional-100">
                 <span className="tabular-nums">DNI {e.dni}</span>
                 <span>·</span>
                 <span>
@@ -225,22 +225,22 @@ export default function LegajoDetalle({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">Legajo Único del Estudiante</p>
+            <p className="text-sm text-institucional-200">Legajo Único del Estudiante</p>
           )}
           <div className="flex shrink-0 items-center gap-1">
             {legajo && (
               <button
                 type="button"
                 onClick={() => setVerPayload((v) => !v)}
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium ring-1 ring-inset ${
-                  verPayload ? "bg-slate-900 text-white ring-slate-900" : "text-slate-600 ring-slate-300 hover:bg-slate-100"
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset ${
+                  verPayload ? "bg-institucional-500 text-institucional-950 ring-institucional-500" : "text-institucional-100 ring-institucional-800 hover:bg-institucional-900"
                 }`}
                 title="Ver el JSON exacto que recibió el navegador"
               >
                 <Braces className="h-4 w-4" aria-hidden /> JSON recibido
               </button>
             )}
-            <button type="button" onClick={onCerrar} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Cerrar legajo">
+            <button type="button" onClick={onCerrar} className="rounded-full p-1.5 text-institucional-200 hover:bg-institucional-900 hover:text-white" aria-label="Cerrar legajo">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -252,7 +252,7 @@ export default function LegajoDetalle({
           </div>
         )}
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {cargando && (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> Cargando legajo…
