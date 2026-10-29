@@ -6,7 +6,7 @@
  * documento (ver reglas @media print en globals.css).
  */
 
-import { GraduationCap } from "lucide-react";
+/* eslint-disable @next/next/no-img-element */
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { formatearFechaHora } from "@/lib/formato";
@@ -78,9 +78,13 @@ export function DocumentoInforme({
   return (
     <article className="mx-auto max-w-[190mm] bg-white font-sans text-slate-900">
       <header className="flex items-center gap-4 border-b-4 border-institucional-600 pb-3">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-institucional-950 ring-2 ring-institucional-400">
-          <GraduationCap className="h-7 w-7 text-institucional-300" aria-hidden />
-        </span>
+        <img
+          src="/logo-escuela.jpg"
+          alt="Escudo Esc. N° 4-012 Ing. Ricardo Videla"
+          width={56}
+          height={56}
+          className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-institucional-400"
+        />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] uppercase tracking-wider text-slate-500">{INSTITUCION.dependencia}</p>
           <p className="text-base font-bold text-institucional-950">{INSTITUCION.nombre}</p>

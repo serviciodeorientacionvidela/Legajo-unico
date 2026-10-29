@@ -1,6 +1,7 @@
 "use client";
 
-import { GraduationCap, Loader2, LockKeyhole } from "lucide-react";
+import { Loader2, LockKeyhole } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
@@ -48,9 +49,14 @@ function FormularioIngreso() {
     <div className="tarjeta grid w-full max-w-4xl overflow-hidden md:grid-cols-2">
       {/* Panel institucional (petróleo) */}
       <div className="flex flex-col items-center justify-center gap-4 bg-institucional-950 px-8 py-10 text-center">
-        <span className="grid h-28 w-28 place-items-center rounded-full ring-4 ring-institucional-400 md:h-36 md:w-36">
-          <GraduationCap className="h-12 w-12 text-institucional-300 md:h-16 md:w-16" aria-hidden />
-        </span>
+        <Image
+          src="/logo-escuela.jpg"
+          alt="Escudo Esc. N° 4-012 Ing. Ricardo Videla"
+          width={144}
+          height={144}
+          className="h-28 w-28 rounded-full object-cover ring-4 ring-institucional-400 md:h-36 md:w-36"
+          priority
+        />
         <div>
           <h1 className="text-xl font-bold text-white">Legajo Único del Estudiante</h1>
           <p className="mt-1 text-sm text-institucional-200">Escuela 4012 · Ing. Ricardo Videla</p>

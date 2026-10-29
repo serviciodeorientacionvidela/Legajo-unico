@@ -4,7 +4,6 @@ import {
   ChartColumn,
   ClipboardList,
   FileSpreadsheet,
-  GraduationCap,
   Info,
   Loader2,
   LogOut,
@@ -13,6 +12,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -472,9 +472,14 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       {/* --- Menú lateral (petróleo) ------------------------------------------------ */}
       <aside className="flex flex-col bg-institucional-950 text-slate-300 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64">
         <div className="flex items-center gap-3 px-5 py-5 lg:flex-col lg:py-8 lg:text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-institucional-900 ring-2 ring-institucional-400 lg:h-20 lg:w-20 lg:ring-4">
-            <GraduationCap className="h-6 w-6 text-institucional-300 lg:h-9 lg:w-9" aria-hidden />
-          </span>
+          <Image
+            src="/logo-escuela.jpg"
+            alt="Escudo Esc. N° 4-012 Ing. Ricardo Videla"
+            width={80}
+            height={80}
+            className="h-12 w-12 rounded-full object-cover ring-2 ring-institucional-400 lg:h-20 lg:w-20 lg:ring-4"
+            priority
+          />
           <div>
             <h1 className="text-base font-bold leading-tight text-white">Legajo Único</h1>
             <p className="text-xs text-institucional-200">del Estudiante · Ciclo 2026</p>
