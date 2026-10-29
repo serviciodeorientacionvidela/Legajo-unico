@@ -20,6 +20,7 @@ const ACCIONES: Record<AccionAuditoria, { etiqueta: string; tono: "azul" | "viol
   CARGAR_INTERVENCION: { etiqueta: "Registró intervención SOE", tono: "violeta" },
   EDITAR_CONFIDENCIAL: { etiqueta: "Editó datos CUD / PPI", tono: "rojo" },
   GENERAR_INFORME: { etiqueta: "Generó informe", tono: "neutro" },
+  GESTIONAR_USUARIO: { etiqueta: "Gestionó usuarios", tono: "ambar" },
 };
 
 export default function AuditoriaPanel({ abierto, onCerrar, cargar }: Props) {

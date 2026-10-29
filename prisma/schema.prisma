@@ -37,16 +37,23 @@ enum AccionAuditoria {
   CARGAR_INTERVENCION
   EDITAR_CONFIDENCIAL
   GENERAR_INFORME
+  GESTIONAR_USUARIO
 }
 
 model Usuario {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  nombre       String
-  passwordHash String
-  rol          Rol
-  activo       Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id              String    @id @default(cuid())
+  email           String    @unique
+  nombre          String
+  passwordHash    String
+  rol             Rol
+  activo          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  dni             String?   @unique
+  /// Cuenta master: puede crear y administrar usuarios (independiente del rol).
+  esAdministrador Boolean   @default(false)
+  /// Foto de perfil como data URL (JPEG reducido a 256 px en el navegador).
+  fotoPerfil      String?   @db.Text
+  fotoActualizada DateTime?
 
   incidentesCargados IncidenteConvivencia[]
   intervencionesSoe  IntervencionSoe[]
@@ -121,7 +128,9 @@ model CalificacionMateria {
 
 // --- Ficha del alumno en el GEI: se reemplaza completa en cada sincronización. PRECEPTOR y DIRECTIVO_SOE ---
 
-/** Un renglón por ciclo y escuela (incluye primaria y otras escuelas). */
+/**
+ * Un renglón por ciclo y escuela (incluye primaria y otras escuelas).
+ */
 model TrayectoriaEscolar {
   id            String     @id @default(cuid())
   estudianteId  String
@@ -141,7 +150,9 @@ model TrayectoriaEscolar {
   @@index([estudianteId, cicloLectivo])
 }
 
-/** Sistema de Alertas Tempranas del GEI. */
+/**
+ * Sistema de Alertas Tempranas del GEI.
+ */
 model AlertaTemprana {
   id               String     @id @default(cuid())
   estudianteId     String
@@ -174,7 +185,9 @@ model FaltaIce {
   @@index([estudianteId, cicloLectivo])
 }
 
-/** Resumen mensual de asistencia del GEI PAD (inasistencias en días, admite medias faltas). */
+/**
+ * Resumen mensual de asistencia del GEI PAD (inasistencias en días, admite medias faltas).
+ */
 model AsistenciaMensual {
   id                 String     @id @default(cuid())
   estudianteId       String

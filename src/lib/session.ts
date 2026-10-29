@@ -58,11 +58,18 @@ export async function obtenerUsuarioSesion(): Promise<UsuarioSesion | null> {
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: datos.id },
-    select: { id: true, email: true, nombre: true, rol: true, activo: true },
+    select: { id: true, email: true, nombre: true, rol: true, activo: true, esAdministrador: true, fotoActualizada: true },
   });
   if (!usuario || !usuario.activo) return null;
 
-  return { id: usuario.id, email: usuario.email, nombre: usuario.nombre, rol: usuario.rol };
+  return {
+    id: usuario.id,
+    email: usuario.email,
+    nombre: usuario.nombre,
+    rol: usuario.rol,
+    esAdministrador: usuario.esAdministrador,
+    fotoVersion: usuario.fotoActualizada?.toISOString() ?? null,
+  };
 }
 
 export async function establecerCookieSesion(res: NextResponse, usuario: UsuarioSesion): Promise<void> {

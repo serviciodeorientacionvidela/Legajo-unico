@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  UserCog,
   Users,
 } from "lucide-react";
 import Image from "next/image";
@@ -36,6 +37,7 @@ import {
   type UsuarioSesion,
 } from "@/lib/types";
 import AuditoriaPanel from "./AuditoriaPanel";
+import Avatar, { urlFotoUsuario } from "./Avatar";
 import ConfidencialModal from "./ConfidencialModal";
 import ImportGeiModal from "./ImportGeiModal";
 import IncidenteModal from "./IncidenteModal";
@@ -47,6 +49,7 @@ import MetricCards, { type FiltroRapido } from "./MetricCards";
 import RoleSimulator from "./RoleSimulator";
 import SessionTimeoutGuard from "./SessionTimeoutGuard";
 import StudentTable from "./StudentTable";
+import UsuariosPanel from "./UsuariosPanel";
 
 type Acceso = "total" | "parcial" | "ninguno";
 
@@ -147,6 +150,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [sesionCerrada, setSesionCerrada] = useState(false);
   const fuente = useMemo(() => (modoDemo ? crearFuenteDemo(rolDemo) : crearFuenteApi()), [modoDemo, rolDemo]);
 
+  const [versionSesion, setVersionSesion] = useState(0);
   useEffect(() => {
     if (modoDemo) return;
     let cancelado = false;
@@ -161,7 +165,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     return () => {
       cancelado = true;
     };
-  }, [modoDemo, router]);
+  }, [modoDemo, router, versionSesion]);
 
   const esErrorDeSesion = useCallback(
     (error: unknown): boolean => {
@@ -274,7 +278,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [modalIntervencion, setModalIntervencion] = useState(false);
   const [modalConfidencial, setModalConfidencial] = useState(false);
   const [modalInforme, setModalInforme] = useState(false);
-  const [vista, setVista] = useState<"estudiantes" | "informes">("estudiantes");
+  const [vista, setVista] = useState<"estudiantes" | "informes" | "usuarios">("estudiantes");
 
   const cargarLegajo = useCallback(
     async (dni: string, silencioso = false) => {
@@ -459,13 +463,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       }
     : null;
 
-  const iniciales = usuario.nombre
-    .replace(/^(Lic|Prof|Dr|Dra)\.\s*/i, "")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase();
+  const esAdministrador = !modoDemo && usuario.esAdministrador === true;
 
   return (
     <div className="min-h-screen lg:pl-64">
@@ -495,7 +493,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
               Informes
             </BotonMenu>
           )}
-          {(tienePermiso(rol, "IMPORTAR_GEI") || tienePermiso(rol, "VER_AUDITORIA")) && (
+          {(tienePermiso(rol, "IMPORTAR_GEI") || tienePermiso(rol, "VER_AUDITORIA") || esAdministrador) && (
             <p className="hidden px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-institucional-300/70 lg:block">
               Administración
             </p>
@@ -510,13 +508,16 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
               Auditoría
             </BotonMenu>
           )}
+          {esAdministrador && (
+            <BotonMenu activo={vista === "usuarios"} onClick={() => setVista("usuarios")} icono={<UserCog className="h-4 w-4" aria-hidden />}>
+              Usuarios
+            </BotonMenu>
+          )}
         </nav>
 
         <div className="mt-auto hidden space-y-3 border-t border-institucional-900 px-5 py-5 lg:block">
           <div className="flex items-center gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-institucional-800 text-xs font-bold text-institucional-100">
-              {iniciales}
-            </span>
+            <Avatar nombre={usuario.nombre} src={urlFotoUsuario(usuario.id, usuario.fotoVersion)} tamanio="sm" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{usuario.nombre}</p>
               <p className="truncate text-xs text-institucional-200">{ROL_ETIQUETA[usuario.rol]}</p>
@@ -538,11 +539,15 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-fondo/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div>
-            <h2 className="text-lg font-bold text-institucional-950">{vista === "informes" ? "Informes" : "Estudiantes"}</h2>
+            <h2 className="text-lg font-bold text-institucional-950">
+              {vista === "informes" ? "Informes" : vista === "usuarios" ? "Usuarios" : "Estudiantes"}
+            </h2>
             <p className="text-xs text-slate-500">
               {vista === "informes"
                 ? "Indicadores institucionales, seguimiento y exportación"
-                : "Escuela 4012 · Mendoza · Ciclo lectivo 2026"}
+                : vista === "usuarios"
+                  ? "Cuentas de acceso, roles y fotos de perfil"
+                  : "Escuela 4012 · Mendoza · Ciclo lectivo 2026"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -587,7 +592,14 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       )}
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-        {vista === "informes" && tienePermiso(rol, "GENERAR_INFORMES") ? (
+        {vista === "usuarios" && esAdministrador ? (
+          <UsuariosPanel
+            usuarioActualId={usuario.id}
+            onAviso={(texto) => setAviso({ texto, tono: "ok" })}
+            onError={esErrorDeSesion}
+            onCambioPropio={() => setVersionSesion((v) => v + 1)}
+          />
+        ) : vista === "informes" && tienePermiso(rol, "GENERAR_INFORMES") ? (
           <InformesPanel cargar={cargarInforme} emisor={`${usuario.nombre} (${ROL_ETIQUETA[rol]})`} onVerLegajo={setDniAbierto} onError={esErrorDeSesion} />
         ) : (
         <>

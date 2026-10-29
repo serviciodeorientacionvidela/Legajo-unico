@@ -112,7 +112,7 @@ export class ErrorFuenteDatos extends Error {
 // API real
 // ===========================================================================
 
-async function solicitar<T>(url: string, init?: RequestInit): Promise<T> {
+export async function solicitar<T>(url: string, init?: RequestInit): Promise<T> {
   const esJson = typeof init?.body === "string";
   const res = await fetch(url, {
     ...init,

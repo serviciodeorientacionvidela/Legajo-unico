@@ -27,6 +27,7 @@ export const ACCIONES_AUDITORIA = [
   "CARGAR_INTERVENCION",
   "EDITAR_CONFIDENCIAL",
   "GENERAR_INFORME",
+  "GESTIONAR_USUARIO",
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 
@@ -374,6 +375,23 @@ export interface UsuarioSesion {
   email: string;
   nombre: string;
   rol: Rol;
+  /** Cuenta master: administra usuarios. */
+  esAdministrador?: boolean;
+  /** Marca de la última foto de perfil (para invalidar la imagen), o null si no tiene. */
+  fotoVersion?: string | null;
+}
+
+/** Usuario del sistema tal como lo ve la cuenta administradora. */
+export interface UsuarioAdministrado {
+  id: string;
+  email: string;
+  nombre: string;
+  dni: string | null;
+  rol: Rol;
+  activo: boolean;
+  esAdministrador: boolean;
+  fotoVersion: string | null;
+  createdAt: string;
 }
 
 export interface RegistroAuditoriaVisible {

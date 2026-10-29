@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "usuario:crear": "tsx scripts/crear-usuario.ts",
+    "usuario:admin": "tsx scripts/hacer-admin.ts",
     "gei:scrape": "tsx scripts/gei-scraper.ts",
     "deploy": "npx --yes vercel@65.5.0 --prod"
   },
