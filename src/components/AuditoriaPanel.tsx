@@ -12,11 +12,14 @@ interface Props {
   cargar: () => Promise<RegistroAuditoriaVisible[]>;
 }
 
-const ACCIONES: Record<AccionAuditoria, { etiqueta: string; tono: "azul" | "violeta" | "ambar" | "verde" }> = {
+const ACCIONES: Record<AccionAuditoria, { etiqueta: string; tono: "azul" | "violeta" | "ambar" | "verde" | "neutro" | "rojo" }> = {
   VER_LEGAJO: { etiqueta: "Consultó legajo", tono: "azul" },
   VER_CUD_SOE: { etiqueta: "Vio datos CUD / SOE", tono: "violeta" },
   CARGAR_ACTA: { etiqueta: "Convivencia / acta", tono: "ambar" },
   IMPORTAR_GEI: { etiqueta: "Importó GEI", tono: "verde" },
+  CARGAR_INTERVENCION: { etiqueta: "Registró intervención SOE", tono: "violeta" },
+  EDITAR_CONFIDENCIAL: { etiqueta: "Editó datos CUD / PPI", tono: "rojo" },
+  GENERAR_INFORME: { etiqueta: "Generó informe", tono: "neutro" },
 };
 
 export default function AuditoriaPanel({ abierto, onCerrar, cargar }: Props) {

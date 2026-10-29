@@ -34,6 +34,9 @@ enum AccionAuditoria {
   VER_CUD_SOE
   CARGAR_ACTA
   IMPORTAR_GEI
+  CARGAR_INTERVENCION
+  EDITAR_CONFIDENCIAL
+  GENERAR_INFORME
 }
 
 model Usuario {
@@ -222,12 +225,18 @@ model IntervencionSoe {
   profesionalId       String
   profesional         Usuario    @relation(fields: [profesionalId], references: [id])
   fecha               DateTime
+  /// ENTREVISTA_ESTUDIANTE, ENTREVISTA_FAMILIA, REUNION_DOCENTES, OBSERVACION_AULICA, DERIVACION_EXTERNA, OTRA
+  tipo                String     @default("ENTREVISTA_ESTUDIANTE")
+  participantes       String?
   motivo              String
   informeConfidencial String     @db.Text
   acuerdosDocentes    String     @db.Text // visible para docentes: sin datos clínicos
   archivoDriveUrl     String?
+  /// Fecha acordada para el próximo seguimiento (agenda del SOE).
+  proximoSeguimiento  DateTime?
 
   @@index([estudianteId, fecha])
+  @@index([proximoSeguimiento])
 }
 
 model AuditLog {

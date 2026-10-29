@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChartColumn,
   ClipboardList,
   FileSpreadsheet,
   GraduationCap,
@@ -19,6 +20,8 @@ import {
   crearFuenteDemo,
   ErrorFuenteDatos,
   reiniciarDemo,
+  type DatosConfidenciales,
+  type NuevaIntervencion,
   type NuevoIncidente,
 } from "@/lib/dataSource";
 import { USUARIOS_DEMO } from "@/lib/demoData";
@@ -33,8 +36,12 @@ import {
   type UsuarioSesion,
 } from "@/lib/types";
 import AuditoriaPanel from "./AuditoriaPanel";
+import ConfidencialModal from "./ConfidencialModal";
 import ImportGeiModal from "./ImportGeiModal";
 import IncidenteModal from "./IncidenteModal";
+import InformeLegajoModal from "./InformeLegajoModal";
+import InformesPanel from "./InformesPanel";
+import IntervencionModal from "./IntervencionModal";
 import LegajoDetalle from "./LegajoDetalle";
 import MetricCards, { type FiltroRapido } from "./MetricCards";
 import RoleSimulator from "./RoleSimulator";
@@ -74,6 +81,10 @@ const MATRIZ_PERMISOS: { modulo: string; acceso: Record<Rol, [Acceso, string]> }
     acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["ninguno", "Sin acceso"], DIRECTIVO_SOE: ["total", "Control total"] },
   },
   {
+    modulo: "Informes institucionales y exportación",
+    acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["parcial", "Generación"], DIRECTIVO_SOE: ["total", "Generación (incluye SOE)"] },
+  },
+  {
     modulo: "Auditoría y sincronización GEI",
     acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["ninguno", "Sin acceso"], DIRECTIVO_SOE: ["total", "Control total"] },
   },
@@ -92,6 +103,22 @@ function useDiferido<T>(valor: T, demoraMs: number): T {
     return () => window.clearTimeout(t);
   }, [valor, demoraMs]);
   return diferido;
+}
+
+function BotonMenu({ activo, onClick, icono, children }: { activo: boolean; onClick: () => void; icono: ReactNode; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={activo ? "page" : undefined}
+      className={`flex shrink-0 items-center gap-3 whitespace-nowrap rounded-full px-4 py-2.5 text-sm transition lg:w-full ${
+        activo ? "bg-institucional-600 font-semibold text-white" : "font-medium text-slate-300 hover:bg-institucional-900 hover:text-white"
+      }`}
+    >
+      {icono}
+      {children}
+    </button>
+  );
 }
 
 function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: ReactNode }) {
@@ -244,6 +271,10 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [modalIncidente, setModalIncidente] = useState(false);
   const [modalImportar, setModalImportar] = useState(false);
   const [modalAuditoria, setModalAuditoria] = useState(false);
+  const [modalIntervencion, setModalIntervencion] = useState(false);
+  const [modalConfidencial, setModalConfidencial] = useState(false);
+  const [modalInforme, setModalInforme] = useState(false);
+  const [vista, setVista] = useState<"estudiantes" | "informes">("estudiantes");
 
   const cargarLegajo = useCallback(
     async (dni: string, silencioso = false) => {
@@ -305,6 +336,36 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     }
   };
 
+  const guardarIntervencion = async (datos: NuevaIntervencion) => {
+    await fuente.cargarIntervencion(datos);
+    setModalIntervencion(false);
+    setAviso({
+      tono: "ok",
+      texto: datos.proximoSeguimiento ? "Intervención registrada y seguimiento agendado." : "Intervención del SOE registrada.",
+    });
+    await cargarLegajo(datos.dni, true);
+  };
+
+  const guardarConfidencial = async (dni: string, datos: DatosConfidenciales) => {
+    setLegajo(await fuente.editarConfidencial(dni, datos));
+    setModalConfidencial(false);
+    setAviso({ tono: "ok", texto: "Datos de inclusión y salud actualizados." });
+    refrescar();
+  };
+
+  const registrarInformeIndividual = useCallback(
+    async (dni: string) => {
+      try {
+        await fuente.registrarInformeIndividual(dni);
+      } catch (error) {
+        if (esErrorDeSesion(error)) return;
+        throw error;
+      }
+    },
+    [fuente, esErrorDeSesion],
+  );
+
+  const cargarInforme = useCallback(() => fuente.obtenerInforme(), [fuente]);
   const cargarAuditoria = useCallback(() => fuente.obtenerAuditoria(), [fuente]);
 
   const importarGei = async (archivo: File) => {
@@ -319,6 +380,9 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     setModalIncidente(false);
     setModalImportar(false);
     setModalAuditoria(false);
+    setModalIntervencion(false);
+    setModalConfidencial(false);
+    setModalInforme(false);
   }, [cerrarLegajo]);
 
   const alExpirarSesion = useCallback(() => {
@@ -351,6 +415,10 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     setModalIncidente(false);
     setModalImportar(false);
     setModalAuditoria(false);
+    setModalIntervencion(false);
+    setModalConfidencial(false);
+    setModalInforme(false);
+    if (!tienePermiso(nuevo, "GENERAR_INFORMES")) setVista("estudiantes");
   };
 
   // --- Render -----------------------------------------------------------------
@@ -413,27 +481,29 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           </div>
         </div>
 
-        <nav aria-label="Secciones" className="space-y-1 px-3">
-          <span className="flex items-center gap-3 rounded-full bg-institucional-600 px-4 py-2.5 text-sm font-semibold text-white" aria-current="page">
-            <Users className="h-4 w-4" aria-hidden /> Estudiantes
-          </span>
+        <nav aria-label="Secciones" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:block lg:space-y-1 lg:pb-0">
+          <BotonMenu activo={vista === "estudiantes"} onClick={() => setVista("estudiantes")} icono={<Users className="h-4 w-4" aria-hidden />}>
+            Estudiantes
+          </BotonMenu>
+          {tienePermiso(rol, "GENERAR_INFORMES") && (
+            <BotonMenu activo={vista === "informes"} onClick={() => setVista("informes")} icono={<ChartColumn className="h-4 w-4" aria-hidden />}>
+              Informes
+            </BotonMenu>
+          )}
+          {(tienePermiso(rol, "IMPORTAR_GEI") || tienePermiso(rol, "VER_AUDITORIA")) && (
+            <p className="hidden px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-institucional-300/70 lg:block">
+              Administración
+            </p>
+          )}
           {tienePermiso(rol, "IMPORTAR_GEI") && (
-            <button
-              type="button"
-              onClick={() => setModalImportar(true)}
-              className="flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-institucional-900 hover:text-white"
-            >
-              <FileSpreadsheet className="h-4 w-4" aria-hidden /> Importar GEI
-            </button>
+            <BotonMenu activo={false} onClick={() => setModalImportar(true)} icono={<FileSpreadsheet className="h-4 w-4" aria-hidden />}>
+              Importar GEI
+            </BotonMenu>
           )}
           {tienePermiso(rol, "VER_AUDITORIA") && (
-            <button
-              type="button"
-              onClick={() => setModalAuditoria(true)}
-              className="flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-institucional-900 hover:text-white"
-            >
-              <ClipboardList className="h-4 w-4" aria-hidden /> Auditoría
-            </button>
+            <BotonMenu activo={false} onClick={() => setModalAuditoria(true)} icono={<ClipboardList className="h-4 w-4" aria-hidden />}>
+              Auditoría
+            </BotonMenu>
           )}
         </nav>
 
@@ -463,8 +533,12 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-fondo/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div>
-            <h2 className="text-lg font-bold text-institucional-950">Estudiantes</h2>
-            <p className="text-xs text-slate-500">Escuela 4012 · Mendoza · Ciclo lectivo 2026</p>
+            <h2 className="text-lg font-bold text-institucional-950">{vista === "informes" ? "Informes" : "Estudiantes"}</h2>
+            <p className="text-xs text-slate-500">
+              {vista === "informes"
+                ? "Indicadores institucionales, seguimiento y exportación"
+                : "Escuela 4012 · Mendoza · Ciclo lectivo 2026"}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <SessionTimeoutGuard onTimeout={alExpirarSesion} onLatido={latido} mostrarContador={modoDemo} />
@@ -508,6 +582,10 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       )}
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
+        {vista === "informes" && tienePermiso(rol, "GENERAR_INFORMES") ? (
+          <InformesPanel cargar={cargarInforme} emisor={`${usuario.nombre} (${ROL_ETIQUETA[rol]})`} onVerLegajo={setDniAbierto} onError={esErrorDeSesion} />
+        ) : (
+        <>
         <MetricCards metricas={metricas} onFiltroRapido={aplicarFiltroRapido} />
 
         <details className="tarjeta group">
@@ -594,6 +672,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
             />
           )}
         </section>
+        </>
+        )}
 
         <footer className="pb-4 text-center text-xs text-slate-400">
           Datos personales de menores protegidos por la Ley 25.326 y la Ley 26.061 · Cada consulta de legajo queda registrada
@@ -612,6 +692,28 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         onCerrar={cerrarLegajo}
         onCargarIncidente={() => setModalIncidente(true)}
         onResolverIncidente={(id, accion) => void resolverIncidente(id, accion)}
+        onGenerarInforme={() => setModalInforme(true)}
+        onNuevaIntervencion={() => setModalIntervencion(true)}
+        onEditarConfidencial={() => setModalConfidencial(true)}
+      />
+      <IntervencionModal
+        abierto={modalIntervencion}
+        estudiante={estudianteAbierto}
+        onCerrar={() => setModalIntervencion(false)}
+        onGuardar={guardarIntervencion}
+      />
+      <ConfidencialModal
+        abierto={modalConfidencial}
+        legajo={legajo}
+        onCerrar={() => setModalConfidencial(false)}
+        onGuardar={guardarConfidencial}
+      />
+      <InformeLegajoModal
+        abierto={modalInforme}
+        legajo={legajo}
+        emisor={`${usuario.nombre} (${ROL_ETIQUETA[rol]})`}
+        onCerrar={() => setModalInforme(false)}
+        onRegistrar={registrarInformeIndividual}
       />
       <IncidenteModal
         abierto={modalIncidente}

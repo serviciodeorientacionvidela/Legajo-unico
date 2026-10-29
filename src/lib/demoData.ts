@@ -24,6 +24,7 @@ import type {
   LegajoFuente,
   Rol,
   TipoIncidente,
+  TipoIntervencion,
   TrayectoriaFuente,
   UsuarioSesion,
 } from "./types";
@@ -79,6 +80,10 @@ interface SpecIncidente {
 
 interface SpecIntervencion {
   fecha: string;
+  tipo?: TipoIntervencion;
+  participantes?: string;
+  /** Próximo seguimiento acordado (agenda del SOE). */
+  seguimiento?: string;
   motivo: string;
   informe: string;
   acuerdos: string;
@@ -111,7 +116,8 @@ const ALUMNOS: SpecAlumno[] = [
     diagnostico: "Trastorno del Espectro Autista (TEA) nivel 1 de apoyo. Hipersensibilidad auditiva. CUD vigente.",
     observaciones: "La familia solicita expresamente no divulgar el diagnóstico entre compañeros. Acompañante terapéutica externa martes y jueves (ingresa 2° módulo).",
     intervenciones: [{
-      fecha: "2026-03-18", motivo: "Ingreso a 1° año: articulación con nivel primario",
+      fecha: "2026-03-18", tipo: "ENTREVISTA_FAMILIA", participantes: "Madre, equipo tratante externo", seguimiento: "2026-11-10",
+      motivo: "Ingreso a 1° año: articulación con nivel primario",
       informe: "Se recibe informe de la escuela primaria y del equipo tratante. Presenta dificultades ante cambios imprevistos de rutina y ambientes ruidosos. Buen rendimiento académico con apoyos. Se acuerda PPI con adecuaciones de acceso (no de contenidos).",
       acuerdos: "Anticipar por escrito cambios de rutina y fechas de evaluación (mínimo 1 semana). Consignas segmentadas y por escrito. Permitir salida breve del aula ante sobrecarga, acordada con preceptoría.",
     }],
@@ -120,7 +126,7 @@ const ALUMNOS: SpecAlumno[] = [
     dni: "53398120", apellidos: "FERNÁNDEZ", nombres: "Tomás Agustín", nacimiento: "2013-11-21", anio: 1, division: "2", base: 6.4, asistencia: 88.0,
     ppi: true, diagnostico: "Dislexia del desarrollo (informe psicopedagógico externo, 03/2026).",
     intervenciones: [{
-      fecha: "2026-04-07", motivo: "Evaluación psicopedagógica",
+      fecha: "2026-04-07", tipo: "DERIVACION_EXTERNA", participantes: "Psicopedagoga externa", motivo: "Evaluación psicopedagógica",
       informe: "Informe externo confirma dislexia del desarrollo. Velocidad lectora significativamente descendida para la edad; comprensión oral conservada. Se sugiere PPI con adecuaciones de acceso y evaluación.",
       acuerdos: "Tiempo extendido (+30%) en evaluaciones escritas. Priorizar evaluación oral complementaria. No penalizar ortografía en espacios no lingüísticos.",
     }],
@@ -136,7 +142,7 @@ const ALUMNOS: SpecAlumno[] = [
     cud: { vencimiento: "2026-11-20" },
     diagnostico: "Hipoacusia neurosensorial bilateral moderada. Usa audífonos.",
     intervenciones: [{
-      fecha: "2026-03-25", motivo: "Adecuaciones de acceso por hipoacusia",
+      fecha: "2026-03-25", tipo: "REUNION_DOCENTES", participantes: "Equipo docente de 3° 1ra", seguimiento: "2026-11-03", motivo: "Adecuaciones de acceso por hipoacusia",
       informe: "Control audiológico al día. El CUD vence en noviembre 2026: se notificó a la familia para iniciar la renovación ante la Junta Evaluadora.",
       acuerdos: "Ubicar en primeras filas. Hablar de frente y sin cubrirse la boca. Apoyar consignas orales por escrito. Usar videos subtitulados.",
     }],
@@ -164,7 +170,7 @@ const ALUMNOS: SpecAlumno[] = [
       { fecha: "2026-09-08", tipo: "LEVE", puntos: 2, motivo: "Se retira del aula sin autorización.", notificado: false },
     ],
     intervenciones: [{
-      fecha: "2026-06-24", motivo: "Derivación por reiteración de faltas de convivencia",
+      fecha: "2026-06-24", tipo: "ENTREVISTA_ESTUDIANTE", participantes: "Estudiante, preceptora", seguimiento: "2026-10-27", motivo: "Derivación por reiteración de faltas de convivencia",
       informe: "Entrevista con el estudiante y la madre. Situación familiar compleja (cambio de domicilio reciente). Se sugiere espacio de escucha quincenal en el SOE y articulación con el CAPS de la zona.",
       acuerdos: "Seguimiento semanal con preceptoría. Reforzar positivamente la participación en clase. Ante conflictos, derivar al SOE antes de sancionar.",
     }],
@@ -254,6 +260,9 @@ function generarIntervenciones(spec: SpecAlumno): IntervencionFuente[] {
   return (spec.intervenciones ?? []).map((int, i) => ({
     id: `${spec.dni}-soe-${i}`,
     fecha: `${int.fecha}T14:00:00.000Z`,
+    tipo: int.tipo ?? "ENTREVISTA_ESTUDIANTE",
+    participantes: int.participantes ?? null,
+    proximoSeguimiento: int.seguimiento ? `${int.seguimiento}T00:00:00.000Z` : null,
     motivo: int.motivo,
     informeConfidencial: int.informe,
     acuerdosDocentes: int.acuerdos,

@@ -29,3 +29,60 @@ summary::-webkit-details-marker {
     @apply rounded-2xl border border-slate-200/70 bg-white shadow-tarjeta;
   }
 }
+
+/* --- Informes imprimibles (A4) ----------------------------------------------------------------
+   Al imprimir con un #zona-impresion montado, solo se imprime ese contenido (sin menú ni modales).
+   Sin #zona-impresion, Ctrl+P imprime la pantalla tal cual. */
+#zona-impresion {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  body:has(> #zona-impresion) > *:not(#zona-impresion) {
+    display: none !important;
+  }
+  #zona-impresion {
+    display: block !important;
+  }
+}
+
+@layer components {
+  .tabla-informe {
+    @apply w-full border-collapse text-xs;
+  }
+  .tabla-informe th {
+    @apply border-b-2 border-institucional-900 px-2 py-1.5 text-left font-bold text-institucional-950;
+  }
+  .tabla-informe td {
+    @apply border-b border-slate-200 px-2 py-1.5 align-top text-slate-800;
+  }
+  .tabla-informe tr {
+    break-inside: avoid;
+  }
+  .evitar-corte {
+    break-inside: avoid;
+  }
+}
+
+@layer components {
+  /* Campo de formulario rectangular (textareas y formularios largos). */
+  .campo {
+    @apply mt-1.5 block w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-normal text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-institucional-500 focus:outline-none focus:ring-2 focus:ring-institucional-500/30 disabled:bg-slate-100;
+  }
+  .etiqueta-campo {
+    @apply block text-sm font-semibold text-slate-700;
+  }
+  .ayuda-campo {
+    @apply mt-1 block text-xs font-normal text-slate-500;
+  }
+}

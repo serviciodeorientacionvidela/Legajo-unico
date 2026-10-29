@@ -6,12 +6,15 @@ import {
   Braces,
   CalendarCheck,
   Check,
+  CalendarClock,
   FileText,
   FolderOpen,
   HeartPulse,
   Loader2,
+  Pencil,
   Phone,
   Plus,
+  Printer,
   School,
   ShieldAlert,
   Trash2,
@@ -24,7 +27,13 @@ import { nivelAlertaPuntos, PUNTOS_INICIALES, REGLAS_INCIDENTE } from "@/lib/con
 import { rutaCarpetaEstudiante, SUBCARPETAS } from "@/lib/driveNombres";
 import { diasHasta, edad, etiquetaCurso, formatearFecha, formatearNota } from "@/lib/formato";
 import { tienePermiso } from "@/lib/rbac";
-import { ROL_ETIQUETA, type IncidenteVisible, type LegajoVisible, type TipoIncidente } from "@/lib/types";
+import {
+  ROL_ETIQUETA,
+  TIPO_INTERVENCION_ETIQUETA,
+  type IncidenteVisible,
+  type LegajoVisible,
+  type TipoIncidente,
+} from "@/lib/types";
 import { GraficoAsistenciaMensual, GraficoMaterias, GraficoPromediosPorCiclo, IndicadoresLegajo } from "./LegajoGraficos";
 import { Bloqueado, Insignia, MensajeError, Seccion } from "./ui";
 
@@ -40,6 +49,22 @@ interface Props {
   onCerrar: () => void;
   onCargarIncidente: () => void;
   onResolverIncidente: (incidenteId: string, accion: "APROBAR" | "ANULAR") => void;
+  onGenerarInforme: () => void;
+  onNuevaIntervencion: () => void;
+  onEditarConfidencial: () => void;
+}
+
+function BotonSeccion({ onClick, icono, children }: { onClick: () => void; icono: ReactNode; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-full bg-institucional-600 px-3 py-1 text-xs font-semibold text-white hover:bg-institucional-700"
+    >
+      {icono}
+      {children}
+    </button>
+  );
 }
 
 const TONO_TIPO: Record<TipoIncidente, "ambar" | "rojo" | "azul" | "neutro"> = {
@@ -144,16 +169,16 @@ function TarjetaIncidente({
                 type="button"
                 disabled={enProceso}
                 onClick={() => onResolver("APROBAR")}
-                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
-                <Check className="h-3.5 w-3.5" aria-hidden /> Aprobar y descontar
+                <Check className="h-3.5 w-3.5" aria-hidden /> Aprobar
               </button>
             )}
             <button
               type="button"
               disabled={enProceso}
               onClick={() => onResolver("ANULAR")}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50 disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200 hover:bg-red-50 disabled:opacity-60"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden /> Dar de baja
             </button>
@@ -175,6 +200,9 @@ export default function LegajoDetalle({
   onCerrar,
   onCargarIncidente,
   onResolverIncidente,
+  onGenerarInforme,
+  onNuevaIntervencion,
+  onEditarConfidencial,
 }: Props) {
   const [verPayload, setVerPayload] = useState(false);
   const [cicloNotas, setCicloNotas] = useState<number | null>(null);
@@ -228,7 +256,16 @@ export default function LegajoDetalle({
             <p className="text-sm text-institucional-200">Legajo Único del Estudiante</p>
           )}
           <div className="flex shrink-0 items-center gap-1">
-            {legajo && (
+            {legajo && !cargando && (
+              <button
+                type="button"
+                onClick={onGenerarInforme}
+                className="inline-flex items-center gap-1.5 rounded-full bg-institucional-500 px-3.5 py-1.5 text-xs font-bold text-institucional-950 hover:bg-institucional-400"
+              >
+                <Printer className="h-4 w-4" aria-hidden /> Generar informe
+              </button>
+            )}
+            {legajo && modoDemo && (
               <button
                 type="button"
                 onClick={() => setVerPayload((v) => !v)}
@@ -274,8 +311,18 @@ export default function LegajoDetalle({
 
               <IndicadoresLegajo legajo={legajo} />
 
-              {(e.tieneCud || e.requierePpi) && (
-                <Seccion titulo="Alerta pedagógica" icono={<Accessibility className="h-4 w-4 text-violet-600" aria-hidden />}>
+              {(e.tieneCud || e.requierePpi || tienePermiso(rol, "EDITAR_DATOS_CONFIDENCIALES")) && (
+                <Seccion
+                  titulo="Inclusión y apoyos"
+                  icono={<Accessibility className="h-4 w-4 text-violet-600" aria-hidden />}
+                  accion={
+                    tienePermiso(rol, "EDITAR_DATOS_CONFIDENCIALES") ? (
+                      <BotonSeccion onClick={onEditarConfidencial} icono={<Pencil className="h-3.5 w-3.5" aria-hidden />}>
+                        Editar
+                      </BotonSeccion>
+                    ) : undefined
+                  }
+                >
                   <div className="flex flex-wrap gap-2">
                     <Insignia tono={e.tieneCud ? "violeta" : "neutro"}>CUD: {e.tieneCud ? "Sí" : "No"}</Insignia>
                     <Insignia tono={e.requierePpi ? "azul" : "neutro"}>PPI: {e.requierePpi ? "Sí" : "No"}</Insignia>
@@ -422,13 +469,9 @@ export default function LegajoDetalle({
                 icono={<ShieldAlert className="h-4 w-4 text-amber-600" aria-hidden />}
                 accion={
                   legajo.convivencia && tienePermiso(rol, "CARGAR_INCIDENTE") && e.estadoMatricula === "REGULAR" ? (
-                    <button
-                      type="button"
-                      onClick={onCargarIncidente}
-                      className="inline-flex items-center gap-1 rounded-md bg-institucional-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-institucional-700"
-                    >
-                      <Plus className="h-3.5 w-3.5" aria-hidden /> Cargar incidente
-                    </button>
+                    <BotonSeccion onClick={onCargarIncidente} icono={<Plus className="h-3.5 w-3.5" aria-hidden />}>
+                      Cargar incidente
+                    </BotonSeccion>
                   ) : undefined
                 }
               >
@@ -620,7 +663,17 @@ export default function LegajoDetalle({
                 </Seccion>
               )}
 
-              <Seccion titulo="Informes del SOE" icono={<HeartPulse className="h-4 w-4 text-rose-600" aria-hidden />}>
+              <Seccion
+                titulo="Informes del SOE"
+                icono={<HeartPulse className="h-4 w-4 text-rose-600" aria-hidden />}
+                accion={
+                  tienePermiso(rol, "CARGAR_INTERVENCION_SOE") ? (
+                    <BotonSeccion onClick={onNuevaIntervencion} icono={<Plus className="h-3.5 w-3.5" aria-hidden />}>
+                      Nueva intervención
+                    </BotonSeccion>
+                  ) : undefined
+                }
+              >
                 {legajo.confidencial ? (
                   legajo.confidencial.intervenciones.length === 0 ? (
                     <p className="text-sm text-slate-500">Sin intervenciones registradas.</p>
@@ -630,11 +683,22 @@ export default function LegajoDetalle({
                         <li key={i.id} className="rounded-lg border border-rose-100 bg-rose-50/40 p-3">
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                             <span className="tabular-nums">{formatearFecha(i.fecha)}</span>
-                            <span>·</span>
+                            <Insignia tono="violeta">{TIPO_INTERVENCION_ETIQUETA[i.tipo]}</Insignia>
                             <span>{i.profesionalNombre}</span>
+                            {i.participantes && <span>· Participantes: {i.participantes}</span>}
                           </div>
-                          <p className="mt-1 text-sm font-medium text-slate-900">{i.motivo}</p>
-                          <p className="mt-1 text-sm text-slate-700">{i.informeConfidencial}</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">{i.motivo}</p>
+                          <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{i.informeConfidencial}</p>
+                          {i.acuerdosDocentes && (
+                            <p className="mt-1.5 text-xs text-slate-600">
+                              <span className="font-semibold">Acuerdos para docentes:</span> {i.acuerdosDocentes}
+                            </p>
+                          )}
+                          {i.proximoSeguimiento && (
+                            <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-institucional-800">
+                              <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Próximo seguimiento: {formatearFecha(i.proximoSeguimiento)}
+                            </p>
+                          )}
                           {i.archivoDriveUrl && (
                             <div className="mt-2">
                               <Enlace url={i.archivoDriveUrl} modoDemo={modoDemo}>

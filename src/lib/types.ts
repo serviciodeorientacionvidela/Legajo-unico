@@ -19,8 +19,35 @@ export type TipoIncidente = (typeof TIPOS_INCIDENTE)[number];
 export const ESTADOS_MATRICULA = ["REGULAR", "PASE", "EGRESADO"] as const;
 export type EstadoMatricula = (typeof ESTADOS_MATRICULA)[number];
 
-export const ACCIONES_AUDITORIA = ["VER_LEGAJO", "VER_CUD_SOE", "CARGAR_ACTA", "IMPORTAR_GEI"] as const;
+export const ACCIONES_AUDITORIA = [
+  "VER_LEGAJO",
+  "VER_CUD_SOE",
+  "CARGAR_ACTA",
+  "IMPORTAR_GEI",
+  "CARGAR_INTERVENCION",
+  "EDITAR_CONFIDENCIAL",
+  "GENERAR_INFORME",
+] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
+
+export const TIPOS_INTERVENCION = [
+  "ENTREVISTA_ESTUDIANTE",
+  "ENTREVISTA_FAMILIA",
+  "REUNION_DOCENTES",
+  "OBSERVACION_AULICA",
+  "DERIVACION_EXTERNA",
+  "OTRA",
+] as const;
+export type TipoIntervencion = (typeof TIPOS_INTERVENCION)[number];
+
+export const TIPO_INTERVENCION_ETIQUETA: Record<TipoIntervencion, string> = {
+  ENTREVISTA_ESTUDIANTE: "Entrevista con el estudiante",
+  ENTREVISTA_FAMILIA: "Entrevista con la familia",
+  REUNION_DOCENTES: "Reunión con docentes",
+  OBSERVACION_AULICA: "Observación áulica",
+  DERIVACION_EXTERNA: "Derivación externa",
+  OTRA: "Otra intervención",
+};
 
 /** Fechas: Date en el servidor (Prisma), string ISO en el cliente / JSON. */
 export type Fecha = Date | string;
@@ -91,6 +118,10 @@ export interface IncidenteFuente {
 export interface IntervencionFuente {
   id: string;
   fecha: Fecha;
+  /** String libre en la base; se normaliza a TipoIntervencion al sanitizar. */
+  tipo: string;
+  participantes: string | null;
+  proximoSeguimiento: Fecha | null;
   motivo: string;
   informeConfidencial: string;
   acuerdosDocentes: string;
@@ -257,6 +288,9 @@ export interface AcuerdoDocenteVisible {
 export interface IntervencionVisible {
   id: string;
   fecha: string;
+  tipo: TipoIntervencion;
+  participantes: string | null;
+  proximoSeguimiento: string | null;
   motivo: string;
   informeConfidencial: string;
   acuerdosDocentes: string;

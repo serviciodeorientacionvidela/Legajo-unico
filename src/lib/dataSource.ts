@@ -7,6 +7,7 @@
 
 import { PUNTOS_INICIALES, validarPuntos } from "./convivencia";
 import { CICLO_DEMO, crearLegajosDemo, USUARIOS_DEMO } from "./demoData";
+import { construirDatosInforme, type DatosInforme } from "./informes";
 import {
   AccesoDenegadoError,
   enRiesgoPedagogico,
@@ -29,6 +30,7 @@ import type {
   RegistroAuditoriaVisible,
   Rol,
   TipoIncidente,
+  TipoIntervencion,
 } from "./types";
 import type { ResultadoImportacionGei } from "@/services/geiParser";
 
@@ -58,6 +60,30 @@ export interface ResultadoIncidente {
   puntosConvivencia: number;
 }
 
+export interface NuevaIntervencion {
+  dni: string;
+  /** AAAA-MM-DD */
+  fecha: string;
+  tipo: TipoIntervencion;
+  participantes: string | null;
+  motivo: string;
+  informeConfidencial: string;
+  acuerdosDocentes: string;
+  archivoDriveUrl: string | null;
+  /** AAAA-MM-DD */
+  proximoSeguimiento: string | null;
+}
+
+export interface DatosConfidenciales {
+  tieneCud: boolean;
+  /** AAAA-MM-DD */
+  vencimientoCud: string | null;
+  requierePpi: boolean;
+  diagnosticoReservado: string | null;
+  cudUrl: string | null;
+  observacionesConfidenciales: string | null;
+}
+
 export interface FuenteDatosLegajo {
   listar(filtros: FiltrosEstudiantes, pagina: number): Promise<ResultadoListado>;
   obtenerLegajo(dni: string): Promise<LegajoVisible>;
@@ -65,6 +91,11 @@ export interface FuenteDatosLegajo {
   resolverIncidente(incidenteId: string, accion: "APROBAR" | "ANULAR"): Promise<{ puntosConvivencia: number }>;
   obtenerAuditoria(): Promise<RegistroAuditoriaVisible[]>;
   importarGei(archivo: File): Promise<ResultadoImportacionGei>;
+  cargarIntervencion(datos: NuevaIntervencion): Promise<{ intervencionId: string }>;
+  editarConfidencial(dni: string, datos: DatosConfidenciales): Promise<LegajoVisible>;
+  obtenerInforme(): Promise<DatosInforme>;
+  /** Deja constancia en auditoría de la emisión de un informe individual. */
+  registrarInformeIndividual(dni: string): Promise<void>;
 }
 
 export class ErrorFuenteDatos extends Error {
@@ -131,6 +162,21 @@ export function crearFuenteApi(): FuenteDatosLegajo {
       const formulario = new FormData();
       formulario.set("archivo", archivo);
       return solicitar<ResultadoImportacionGei>("/api/gei/import", { method: "POST", body: formulario });
+    },
+    cargarIntervencion(datos) {
+      return solicitar<{ intervencionId: string }>("/api/intervenciones", { method: "POST", body: JSON.stringify(datos) });
+    },
+    editarConfidencial(dni, datos) {
+      return solicitar<LegajoVisible>(`/api/estudiantes/${encodeURIComponent(dni)}`, {
+        method: "PATCH",
+        body: JSON.stringify(datos),
+      });
+    },
+    obtenerInforme() {
+      return solicitar<DatosInforme>("/api/informes");
+    },
+    async registrarInformeIndividual(dni) {
+      await solicitar<{ registrado: boolean }>("/api/informes", { method: "POST", body: JSON.stringify({ dni }) });
     },
   };
 }
@@ -431,6 +477,60 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
       auditar(null, "IMPORTAR_GEI");
       resultado.duracionMs = Date.now() - inicio;
       return respuesta(resultado);
+    },
+
+    async cargarIntervencion(datos) {
+      verificar(rol, "CARGAR_INTERVENCION_SOE");
+      if (datos.motivo.trim().length < 5) throw new ErrorFuenteDatos("Indique el motivo (mínimo 5 caracteres).", 400);
+      if (datos.informeConfidencial.trim().length < 10) throw new ErrorFuenteDatos("Redacte el informe (mínimo 10 caracteres).", 400);
+      if (datos.proximoSeguimiento && datos.proximoSeguimiento < datos.fecha) {
+        throw new ErrorFuenteDatos("El próximo seguimiento debe ser posterior a la intervención.", 400);
+      }
+      const legajo = buscar(datos.dni);
+      const id = nuevoId("soe");
+      legajo.intervenciones.push({
+        id,
+        fecha: `${datos.fecha}T12:00:00.000Z`,
+        tipo: datos.tipo,
+        participantes: datos.participantes,
+        proximoSeguimiento: datos.proximoSeguimiento ? `${datos.proximoSeguimiento}T00:00:00.000Z` : null,
+        motivo: datos.motivo.trim(),
+        informeConfidencial: datos.informeConfidencial.trim(),
+        acuerdosDocentes: datos.acuerdosDocentes.trim(),
+        archivoDriveUrl: datos.archivoDriveUrl,
+        profesional: { nombre: usuario.nombre },
+      });
+      legajo.updatedAt = new Date().toISOString();
+      auditar(datos.dni, "CARGAR_INTERVENCION");
+      return respuesta({ intervencionId: id });
+    },
+
+    async editarConfidencial(dni, datos) {
+      verificar(rol, "EDITAR_DATOS_CONFIDENCIALES");
+      const legajo = buscar(dni);
+      Object.assign(legajo, {
+        tieneCud: datos.tieneCud,
+        vencimientoCud: datos.tieneCud && datos.vencimientoCud ? `${datos.vencimientoCud}T00:00:00.000Z` : null,
+        cudUrl: datos.tieneCud ? datos.cudUrl : null,
+        requierePpi: datos.requierePpi,
+        diagnosticoReservado: datos.diagnosticoReservado,
+        observacionesConfidenciales: datos.observacionesConfidenciales,
+        updatedAt: new Date().toISOString(),
+      });
+      auditar(dni, "EDITAR_CONFIDENCIAL");
+      return respuesta(sanitizarLegajo(legajo, rol));
+    },
+
+    async obtenerInforme() {
+      verificar(rol, "GENERAR_INFORMES");
+      auditar(null, "GENERAR_INFORME");
+      return respuesta(construirDatosInforme(almacenDemo.legajos, rol));
+    },
+
+    async registrarInformeIndividual(dni) {
+      buscar(dni);
+      auditar(dni, "GENERAR_INFORME");
+      await respuesta(null);
     },
   };
 }

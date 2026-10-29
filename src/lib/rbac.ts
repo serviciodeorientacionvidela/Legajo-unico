@@ -11,6 +11,7 @@
  * | Indicador CUD / PPI                       | Solo Sí/No | Solo Sí/No         | Diagnóstico y PDF                 |
  * | Régimen de convivencia                    | Sin acceso | Carga y lectura    | Aprobación, quita de puntos, baja |
  * | Informes SOE y carpeta Drive confidencial | Sin acceso | Sin acceso         | Control total                     |
+ * | Informes institucionales y exportación    | Sin acceso | Generación         | Generación (incluye SOE)          |
  * | Logs de auditoría y sincronización GEI    | Sin acceso | Sin acceso         | Control total                     |
  *
  * Este módulo es puro (sin dependencias de servidor) para que el modo demostración del
@@ -21,13 +22,15 @@
  * no se filtre por accidente.
  */
 
-import type {
-  EstudianteFuente,
-  EstudianteResumen,
-  Fecha,
-  LegajoFuente,
-  LegajoVisible,
-  Rol,
+import {
+  TIPOS_INTERVENCION,
+  type EstudianteFuente,
+  type EstudianteResumen,
+  type Fecha,
+  type LegajoFuente,
+  type LegajoVisible,
+  type Rol,
+  type TipoIntervencion,
 } from "./types";
 
 export const PERMISOS = {
@@ -39,6 +42,9 @@ export const PERMISOS = {
   CARGAR_INCIDENTE: ["DIRECTIVO_SOE", "PRECEPTOR"],
   APROBAR_INCIDENTE: ["DIRECTIVO_SOE"],
   VER_DATOS_CONFIDENCIALES: ["DIRECTIVO_SOE"],
+  EDITAR_DATOS_CONFIDENCIALES: ["DIRECTIVO_SOE"],
+  CARGAR_INTERVENCION_SOE: ["DIRECTIVO_SOE"],
+  GENERAR_INFORMES: ["DIRECTIVO_SOE", "PRECEPTOR"],
   VER_AUDITORIA: ["DIRECTIVO_SOE"],
   IMPORTAR_GEI: ["DIRECTIVO_SOE"],
 } as const satisfies Record<string, readonly Rol[]>;
@@ -72,6 +78,10 @@ export function enRiesgoPedagogico(e: { promedioGeneral: number; porcentajeAsist
 
 export function urlCarpetaDrive(folderId: string | null): string | null {
   return folderId ? `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}` : null;
+}
+
+export function normalizarTipoIntervencion(tipo: string): TipoIntervencion {
+  return (TIPOS_INTERVENCION as readonly string[]).includes(tipo) ? (tipo as TipoIntervencion) : "OTRA";
 }
 
 function iso(fecha: Fecha): string {
@@ -249,6 +259,9 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
           intervenciones: intervencionesOrdenadas.map((i) => ({
             id: i.id,
             fecha: iso(i.fecha),
+            tipo: normalizarTipoIntervencion(i.tipo),
+            participantes: i.participantes,
+            proximoSeguimiento: isoONull(i.proximoSeguimiento),
             motivo: i.motivo,
             informeConfidencial: i.informeConfidencial,
             acuerdosDocentes: i.acuerdosDocentes,
