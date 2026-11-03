@@ -16,7 +16,7 @@ export const ROL_ETIQUETA: Record<Rol, string> = {
 export const TIPOS_INCIDENTE = ["LEVE", "MODERADA", "GRAVE", "ACUERDO_PEDAGOGICO"] as const;
 export type TipoIncidente = (typeof TIPOS_INCIDENTE)[number];
 
-export const ESTADOS_MATRICULA = ["REGULAR", "PASE", "EGRESADO"] as const;
+export const ESTADOS_MATRICULA = ["REGULAR", "PASE", "EGRESADO", "ABANDONO"] as const;
 export type EstadoMatricula = (typeof ESTADOS_MATRICULA)[number];
 
 export const ACCIONES_AUDITORIA = [
@@ -28,8 +28,167 @@ export const ACCIONES_AUDITORIA = [
   "EDITAR_CONFIDENCIAL",
   "GENERAR_INFORME",
   "GESTIONAR_USUARIO",
+  "CARGAR_ACTUACION",
+  "CARGAR_DERIVACION",
+  "REGISTRAR_SEGUIMIENTO",
+  "GESTIONAR_SITUACION",
+  "VER_FICHA_ANEXA",
+  "EDITAR_FICHA_ANEXA",
+  "VER_REPORTE_RESTRINGIDO",
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
+
+// ---------------------------------------------------------------------------
+// Seguimiento de trayectorias: actuaciones, derivaciones, seguimientos, situaciones y fichas anexas.
+// ---------------------------------------------------------------------------
+
+export const TIPOS_ACTUACION = [
+  "INASISTENCIAS",
+  "CONVIVENCIA_ICE",
+  "FAMILIA",
+  "SALUD",
+  "PROTOCOLO",
+  "ESCOLARIDAD_PROTEGIDA",
+  "DEPORTISTA_FEDERADO",
+  "INCLUSION_PPI",
+  "OTRA",
+] as const;
+export type TipoActuacion = (typeof TIPOS_ACTUACION)[number];
+
+export const TIPO_ACTUACION_ETIQUETA: Record<TipoActuacion, string> = {
+  INASISTENCIAS: "Inasistencias",
+  CONVIVENCIA_ICE: "Convivencia / ICE",
+  FAMILIA: "Familia",
+  SALUD: "Salud",
+  PROTOCOLO: "Protocolo (Dec. 1187, bullying, amenazas)",
+  ESCOLARIDAD_PROTEGIDA: "Escolaridad protegida",
+  DEPORTISTA_FEDERADO: "Deportista federado",
+  INCLUSION_PPI: "Inclusión / PPI",
+  OTRA: "Otra",
+};
+
+/** Valores de Actuacion.tipoActa (texto libre en la base para poder sumar tipos sin migrar). */
+export const TIPOS_ACTA = [
+  "Acta compromiso",
+  "Citación con familia",
+  "Entrevista con familia",
+  "Acta de descargo",
+  "Intervención territorial",
+  "Otra acta",
+] as const;
+export type TipoActa = (typeof TIPOS_ACTA)[number];
+
+export const MOTIVOS_APERTURA = [
+  "INASISTENCIAS",
+  "ICE_CERO",
+  "FALTA_GRAVE",
+  "PROTOCOLO",
+  "DERIVACION_SOE",
+  "CONDICIONALIDAD",
+  "ESCOLARIDAD_PROTEGIDA",
+  "PPI",
+  "DEPORTISTA_FEDERADO",
+  "OTRO",
+] as const;
+export type MotivoApertura = (typeof MOTIVOS_APERTURA)[number];
+
+export const MOTIVO_APERTURA_ETIQUETA: Record<MotivoApertura, string> = {
+  INASISTENCIAS: "20 inasistencias",
+  ICE_CERO: "ICE en 0",
+  FALTA_GRAVE: "Falta grave o extremadamente grave",
+  PROTOCOLO: "Activación de protocolo",
+  DERIVACION_SOE: "Derivación al SOE",
+  CONDICIONALIDAD: "Condicionalidad",
+  ESCOLARIDAD_PROTEGIDA: "Escolaridad protegida",
+  PPI: "Incorporación a PPI",
+  DEPORTISTA_FEDERADO: "Deportista federado",
+  OTRO: "Otro motivo",
+};
+
+export const DESTINOS_DERIVACION = ["INTERNA_PSICOPEDAGOGICA", "INTERNA_SOCIAL", "EXTERNA_ORGANISMO"] as const;
+export type DestinoDerivacion = (typeof DESTINOS_DERIVACION)[number];
+
+export const DESTINO_DERIVACION_ETIQUETA: Record<DestinoDerivacion, string> = {
+  INTERNA_PSICOPEDAGOGICA: "Interna: orientación psicopedagógica",
+  INTERNA_SOCIAL: "Interna: orientación social",
+  EXTERNA_ORGANISMO: "Externa: organismo",
+};
+
+export const ESTADOS_DERIVACION = ["PENDIENTE", "EN_CURSO", "CERRADA"] as const;
+export type EstadoDerivacion = (typeof ESTADOS_DERIVACION)[number];
+
+export const ESTADOS_SEGUIMIENTO = ["PROGRAMADO", "REALIZADO", "CANCELADO"] as const;
+export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
+
+export const TIPOS_SITUACION = [
+  "ESCOLARIDAD_PROTEGIDA",
+  "DEPORTISTA_FEDERADO",
+  "CONDICIONAL_INASISTENCIAS",
+  "EXTENSION_INASISTENCIAS",
+  "EMBARAZO_PATERNIDAD_LACTANCIA",
+  "ENFERMEDAD_APRENDIZAJE",
+  "JUDICIALIZADO",
+  "ESCUELA_DOMICILIARIA",
+  "CAMBIO_GENERO",
+  "OTRA",
+] as const;
+export type TipoSituacion = (typeof TIPOS_SITUACION)[number];
+
+export const TIPO_SITUACION_ETIQUETA: Record<TipoSituacion, string> = {
+  ESCOLARIDAD_PROTEGIDA: "Escolaridad protegida",
+  DEPORTISTA_FEDERADO: "Deportista federado (Res. 711/2024)",
+  CONDICIONAL_INASISTENCIAS: "Condicional por inasistencias",
+  EXTENSION_INASISTENCIAS: "Extensión de inasistencias",
+  EMBARAZO_PATERNIDAD_LACTANCIA: "Embarazo, paternidad o lactancia",
+  ENFERMEDAD_APRENDIZAJE: "Enfermedad o problema de aprendizaje",
+  JUDICIALIZADO: "Situación judicializada",
+  ESCUELA_DOMICILIARIA: "Escuela domiciliaria",
+  CAMBIO_GENERO: "Resolución de cambio de género",
+  OTRA: "Otra situación",
+};
+
+/** Nivel de acceso por defecto de cada tipo (reportes 5, 6 y 10 restringidos; 9 solo dirección). */
+export const NIVEL_ACCESO_SITUACION: Record<TipoSituacion, NivelAcceso> = {
+  ESCOLARIDAD_PROTEGIDA: "GENERAL",
+  DEPORTISTA_FEDERADO: "GENERAL",
+  CONDICIONAL_INASISTENCIAS: "GENERAL",
+  EXTENSION_INASISTENCIAS: "GENERAL",
+  EMBARAZO_PATERNIDAD_LACTANCIA: "RESTRINGIDO",
+  ENFERMEDAD_APRENDIZAJE: "RESTRINGIDO",
+  JUDICIALIZADO: "RESTRINGIDO",
+  ESCUELA_DOMICILIARIA: "GENERAL",
+  CAMBIO_GENERO: "SOLO_DIRECCION",
+  OTRA: "GENERAL",
+};
+
+/** Formas de la escolaridad protegida (SituacionEspecial.forma). */
+export const FORMAS_ESCOLARIDAD_PROTEGIDA = ["INASISTENCIAS", "SALUD", "DEPORTISTA_FEDERADO", "EMBARAZO", "OTRA"] as const;
+export type FormaEscolaridadProtegida = (typeof FORMAS_ESCOLARIDAD_PROTEGIDA)[number];
+
+/** Valores de SituacionEspecial.aval. */
+export const AVALES = ["Dirección", "Supervisión"] as const;
+export type Aval = (typeof AVALES)[number];
+
+/** "POR_VENCER" y "VENCIDA" no se guardan: se calculan con la fecha de vencimiento. */
+export const ESTADOS_SITUACION = ["PENDIENTE", "VIGENTE", "CUMPLIDA", "DENEGADA", "DADA_DE_BAJA"] as const;
+export type EstadoSituacion = (typeof ESTADOS_SITUACION)[number];
+
+export const NIVELES_ACCESO = ["GENERAL", "RESTRINGIDO", "SOLO_DIRECCION"] as const;
+export type NivelAcceso = (typeof NIVELES_ACCESO)[number];
+
+export const TIPOS_FICHA_ANEXA = ["SALUD", "PSICOSOCIAL"] as const;
+export type TipoFichaAnexa = (typeof TIPOS_FICHA_ANEXA)[number];
+
+export const TIPOS_NOTIFICACION = [
+  "SEGUIMIENTO_PROXIMO",
+  "SEGUIMIENTO_HOY",
+  "SEGUIMIENTO_VENCIDO",
+  "DERIVACION_RECIBIDA",
+  "ALERTA_INASISTENCIAS",
+  "LEGAJO_ABIERTO",
+  "SITUACION_POR_VENCER",
+] as const;
+export type TipoNotificacion = (typeof TIPOS_NOTIFICACION)[number];
 
 export const TIPOS_INTERVENCION = [
   "ENTREVISTA_ESTUDIANTE",

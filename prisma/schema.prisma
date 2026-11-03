@@ -20,6 +20,7 @@ enum EstadoMatricula {
   REGULAR
   PASE
   EGRESADO
+  ABANDONO
 }
 
 enum TipoIncidente {
@@ -38,6 +39,106 @@ enum AccionAuditoria {
   EDITAR_CONFIDENCIAL
   GENERAR_INFORME
   GESTIONAR_USUARIO
+  CARGAR_ACTUACION
+  CARGAR_DERIVACION
+  REGISTRAR_SEGUIMIENTO
+  GESTIONAR_SITUACION
+  VER_FICHA_ANEXA
+  EDITAR_FICHA_ANEXA
+  VER_REPORTE_RESTRINGIDO
+}
+
+// --- Seguimiento de trayectorias (maquetas: legajo, nueva actuación, derivación, apertura y reportes) ---
+
+/// Los 9 tipos de la maqueta "Nueva actuación".
+enum TipoActuacion {
+  INASISTENCIAS
+  CONVIVENCIA_ICE
+  FAMILIA
+  SALUD
+  PROTOCOLO
+  ESCOLARIDAD_PROTEGIDA
+  DEPORTISTA_FEDERADO
+  INCLUSION_PPI
+  OTRA
+}
+
+/// Por qué se abrió el legajo (maqueta "Cuándo se abre el legajo").
+enum MotivoApertura {
+  INASISTENCIAS
+  ICE_CERO
+  FALTA_GRAVE
+  PROTOCOLO
+  DERIVACION_SOE
+  CONDICIONALIDAD
+  ESCOLARIDAD_PROTEGIDA
+  PPI
+  DEPORTISTA_FEDERADO
+  OTRO
+}
+
+enum DestinoDerivacion {
+  INTERNA_PSICOPEDAGOGICA
+  INTERNA_SOCIAL
+  EXTERNA_ORGANISMO
+}
+
+enum EstadoDerivacion {
+  /// En la bandeja del SOE, sin la parte B.
+  PENDIENTE
+  EN_CURSO
+  CERRADA
+}
+
+enum EstadoSeguimiento {
+  PROGRAMADO
+  REALIZADO
+  CANCELADO
+}
+
+enum TipoSituacion {
+  ESCOLARIDAD_PROTEGIDA
+  DEPORTISTA_FEDERADO
+  CONDICIONAL_INASISTENCIAS
+  EXTENSION_INASISTENCIAS
+  EMBARAZO_PATERNIDAD_LACTANCIA
+  ENFERMEDAD_APRENDIZAJE
+  JUDICIALIZADO
+  ESCUELA_DOMICILIARIA
+  CAMBIO_GENERO
+  OTRA
+}
+
+/// "Por vencer" y "vencida" no se guardan: se calculan con fechaVencimiento.
+enum EstadoSituacion {
+  /// Pedida o a la espera del aval (por ejemplo, extensión de inasistencias sin aval de Supervisión).
+  PENDIENTE
+  VIGENTE
+  CUMPLIDA
+  DENEGADA
+  DADA_DE_BAJA
+}
+
+/// GENERAL: preceptoría y equipo directivo/SOE. RESTRINGIDO: SOE y equipo directivo. SOLO_DIRECCION: equipo directivo.
+enum NivelAcceso {
+  GENERAL
+  RESTRINGIDO
+  SOLO_DIRECCION
+}
+
+enum TipoFichaAnexa {
+  SALUD
+  PSICOSOCIAL
+}
+
+enum TipoNotificacion {
+  SEGUIMIENTO_PROXIMO
+  SEGUIMIENTO_HOY
+  SEGUIMIENTO_VENCIDO
+  DERIVACION_RECIBIDA
+  ALERTA_INASISTENCIAS
+  LEGAJO_ABIERTO
+  SITUACION_POR_VENCER
 }
 
 model Usuario {
@@ -58,6 +159,14 @@ model Usuario {
   incidentesCargados IncidenteConvivencia[]
   intervencionesSoe  IntervencionSoe[]
   auditLogs          AuditLog[]
+
+  actuaciones            Actuacion[]
+  derivacionesEnviadas   Derivacion[]        @relation("DerivacionDerivadoPor")
+  derivacionesAtendidas  Derivacion[]        @relation("DerivacionProfesionalSoe")
+  seguimientosACargo     SeguimientoCaso[]
+  situacionesRegistradas SituacionEspecial[]
+  fichasCargadas         FichaAnexa[]
+  notificaciones         Notificacion[]
 }
 
 model Estudiante {
@@ -100,6 +209,17 @@ model Estudiante {
   estadoMatricula EstadoMatricula @default(REGULAR)
   updatedAt       DateTime        @updatedAt
 
+  // --- Apertura del legajo de seguimiento: null mientras no se haya abierto ---
+  legajoAbiertoEl       DateTime?
+  motivoApertura        MotivoApertura?
+  /// Texto que acompaña al motivo, p. ej. "Intervención del SOE".
+  detalleApertura       String?
+  // Foto del rendimiento el día de la apertura (para "al abrir: 9 · límite 20").
+  aperturaPromedio      Float?
+  aperturaPendientes    Int?
+  aperturaInasistencias Float?
+  aperturaIce           Int?
+
   calificaciones CalificacionMateria[]
   incidentes     IncidenteConvivencia[]
   intervenciones IntervencionSoe[]
@@ -107,6 +227,12 @@ model Estudiante {
   alertas        AlertaTemprana[]
   faltasIce      FaltaIce[]
   asistencias    AsistenciaMensual[]
+  actuaciones    Actuacion[]
+  derivaciones   Derivacion[]
+  seguimientos   SeguimientoCaso[]
+  situaciones    SituacionEspecial[]
+  fichasAnexas   FichaAnexa[]
+  notificaciones Notificacion[]
 
   @@index([anio, division])
   @@index([apellidos])
@@ -228,6 +354,9 @@ model IncidenteConvivencia {
   aprobadoPorId     String?
   anulado           Boolean       @default(false)
 
+  /// Actuación que originó la quita de puntos (efecto "Quita de puntos ICE").
+  actuacion Actuacion?
+
   @@index([estudianteId, fecha])
 }
 
@@ -263,4 +392,210 @@ model AuditLog {
 
   @@index([estudianteDni, createdAt])
   @@index([usuarioId, createdAt])
+}
+
+/**
+ * Cada hecho de la línea de tiempo del legajo (maqueta "Nueva actuación").
+ * El registro digital es un índice: el acta original sigue en el libro de actas.
+ */
+model Actuacion {
+  id           String        @id @default(cuid())
+  estudianteId String
+  estudiante   Estudiante    @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  autorId      String
+  autor        Usuario       @relation(fields: [autorId], references: [id])
+  fecha        DateTime
+  /// Para agrupar la línea de tiempo por ciclo lectivo.
+  cicloLectivo Int
+  tipo         TipoActuacion
+  /// Una línea.
+  motivo       String
+  /// Hasta 3 líneas.
+  resumen      String        @db.Text
+
+  // --- Acta (si corresponde) ---
+  /// Acta compromiso, citación con familia, acta de descargo, etc. (lista en src/lib/types.ts).
+  tipoActa  String?
+  actaLibro String?
+  actaFolio String?
+
+  // --- Efectos ---
+  confidencial Boolean               @default(false)
+  /// Puntos ICE que se pidió quitar; la quita sigue el circuito de IncidenteConvivencia (preceptor carga, directivo aprueba).
+  puntosIce    Int?
+  incidenteId  String?               @unique
+  incidente    IncidenteConvivencia? @relation(fields: [incidenteId], references: [id], onDelete: SetNull)
+
+  /// Derivación al SOE a la que pertenece este paso, si la hay.
+  derivacionId String?
+  derivacion   Derivacion? @relation(fields: [derivacionId], references: [id], onDelete: SetNull)
+
+  /// Situaciones que esta actuación marcó (p. ej. "Condicional por inasistencias").
+  situaciones SituacionEspecial[]
+
+  createdAt DateTime @default(now())
+
+  @@index([estudianteId, fecha])
+  @@index([estudianteId, cicloLectivo])
+}
+
+/**
+ * Derivación al SOE. Parte A: quien deriva. Parte B: el SOE. Parte C: SeguimientoCaso.
+ */
+model Derivacion {
+  id           String     @id @default(cuid())
+  estudianteId String
+  estudiante   Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+
+  // --- A · La completa quien deriva ---
+  fecha         DateTime
+  derivadoPorId String
+  derivadoPor   Usuario  @relation("DerivacionDerivadoPor", fields: [derivadoPorId], references: [id])
+  motivo        String   @db.Text
+
+  // --- B · La completa el SOE ---
+  profesionalSoeId String?
+  profesionalSoe   Usuario?           @relation("DerivacionProfesionalSoe", fields: [profesionalSoeId], references: [id])
+  recibidaEl       DateTime?
+  accionesSoe      String?            @db.Text
+  /// Respuesta a quien deriva y a la familia (si corresponde).
+  respuesta        String?            @db.Text
+  destino          DestinoDerivacion?
+  /// Solo para destino EXTERNA_ORGANISMO.
+  organismoExterno String?
+
+  estado    EstadoDerivacion @default(PENDIENTE)
+  cerradaEl DateTime?
+
+  seguimientos   SeguimientoCaso[]
+  actuaciones    Actuacion[]
+  situaciones    SituacionEspecial[]
+  notificaciones Notificacion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([estado, fecha])
+  @@index([estudianteId, fecha])
+}
+
+/**
+ * Seguimiento programado o realizado (parte C de la derivación y "Seguimientos pendientes" del legajo).
+ * Avisos: 2 días antes y el día de la fecha; si no se registra, se repite y llega al equipo directivo.
+ */
+model SeguimientoCaso {
+  id            String             @id @default(cuid())
+  estudianteId  String
+  estudiante    Estudiante         @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  derivacionId  String?
+  derivacion    Derivacion?        @relation(fields: [derivacionId], references: [id], onDelete: Cascade)
+  situacionId   String?
+  situacion     SituacionEspecial? @relation(fields: [situacionId], references: [id], onDelete: SetNull)
+  responsableId String?
+  responsable   Usuario?           @relation(fields: [responsableId], references: [id])
+
+  fechaProgramada DateTime
+  descripcion     String
+  estado          EstadoSeguimiento @default(PROGRAMADO)
+  realizadoEl     DateTime?
+  /// Qué pasó (p. ej. "Se controla la asistencia de la semana. Mejora parcial.").
+  resultado       String?           @db.Text
+
+  avisoLue    Boolean @default(true)
+  /// Correo institucional con el recordatorio, sin datos sensibles.
+  avisoCorreo Boolean @default(false)
+
+  notificaciones Notificacion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([estado, fechaProgramada])
+  @@index([estudianteId, fechaProgramada])
+  @@index([responsableId, estado])
+}
+
+/**
+ * Situaciones especiales con forma, aval y vencimiento. Alimentan las etiquetas de "Situación actual",
+ * las reglas de apertura del legajo y casi todos los reportes.
+ */
+model SituacionEspecial {
+  id               String          @id @default(cuid())
+  estudianteId     String
+  estudiante       Estudiante      @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  tipo             TipoSituacion
+  /// Escolaridad protegida: INASISTENCIAS, SALUD, DEPORTISTA_FEDERADO... (lista en src/lib/types.ts).
+  forma            String?
+  /// Quién avala: Dirección o Supervisión. null = sin aval todavía.
+  aval             String?
+  estado           EstadoSituacion @default(VIGENTE)
+  nivelAcceso      NivelAcceso     @default(GENERAL)
+  fechaInicio      DateTime
+  fechaVencimiento DateTime?
+  fechaFin         DateTime?
+  /// Datos propios de cada tipo (federación, fecha probable, organismo, resolución...). Ver src/lib/types.ts.
+  detalle          Json?
+  observaciones    String?         @db.Text
+
+  actuacionId     String?
+  actuacion       Actuacion?  @relation(fields: [actuacionId], references: [id], onDelete: SetNull)
+  derivacionId    String?
+  derivacion      Derivacion? @relation(fields: [derivacionId], references: [id], onDelete: SetNull)
+  registradaPorId String
+  registradaPor   Usuario     @relation(fields: [registradaPorId], references: [id])
+
+  seguimientos SeguimientoCaso[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo, estado])
+  @@index([estudianteId, tipo])
+  @@index([fechaVencimiento])
+}
+
+/**
+ * Fichas de salud y psicosocial que se anexan al abrir el legajo.
+ * Acceso: SOE y equipo directivo (a validar con el SOE). Cada consulta queda en la auditoría.
+ */
+model FichaAnexa {
+  id           String         @id @default(cuid())
+  estudianteId String
+  estudiante   Estudiante     @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  tipo         TipoFichaAnexa
+  /// Campos de la ficha; el formulario todavía no está definido.
+  datos        Json
+  cargadaPorId String
+  cargadaPor   Usuario        @relation(fields: [cargadaPorId], references: [id])
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([estudianteId, tipo])
+}
+
+/**
+ * Avisos dentro del LUE (y, más adelante, por correo).
+ */
+model Notificacion {
+  id              String           @id @default(cuid())
+  usuarioId       String
+  usuario         Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo            TipoNotificacion
+  titulo          String
+  mensaje         String
+  enlace          String?
+  estudianteId    String?
+  estudiante      Estudiante?      @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+  seguimientoId   String?
+  seguimiento     SeguimientoCaso? @relation(fields: [seguimientoId], references: [id], onDelete: Cascade)
+  derivacionId    String?
+  derivacion      Derivacion?      @relation(fields: [derivacionId], references: [id], onDelete: Cascade)
+  /// Evita que la tarea diaria repita el mismo aviso (p. ej. "seguimiento:<id>:hoy:<usuario>").
+  claveDedup      String?          @unique
+  leida           Boolean          @default(false)
+  leidaEl         DateTime?
+  correoEnviadoEl DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([usuarioId, leida, createdAt])
 }

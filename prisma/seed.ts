@@ -10,8 +10,10 @@
 
 import { config as cargarEnv } from "dotenv";
 import bcrypt from "bcryptjs";
-import { PrismaClient, type Rol } from "@prisma/client";
+import { Prisma, PrismaClient, type Rol } from "@prisma/client";
 import { crearLegajosDemo, PROFESIONAL_SOE_DEMO, USUARIOS_DEMO } from "../src/lib/demoData";
+import { crearSeguimientoDemo, DNIS_SEGUIMIENTO_DEMO, type AutorDemo } from "../src/lib/demoSeguimiento";
+import type { LegajoFuente } from "../src/lib/types";
 
 cargarEnv({ path: ".env.local" });
 cargarEnv();
@@ -42,7 +44,10 @@ async function main(): Promise<void> {
     return id;
   };
 
-  for (const l of crearLegajosDemo()) {
+  const legajos = crearLegajosDemo();
+  const idsPorDni = new Map<string, string>();
+
+  for (const l of legajos) {
     const datos = {
       cuil: l.cuil,
       apellidos: l.apellidos,
@@ -73,6 +78,7 @@ async function main(): Promise<void> {
       create: { dni: l.dni, ...datos },
       update: datos,
     });
+    idsPorDni.set(l.dni, estudiante.id);
 
     // Relaciones: se regeneran completas para que el seed sea idempotente.
     await prisma.$transaction([
@@ -124,8 +130,178 @@ async function main(): Promise<void> {
     ]);
   }
 
+  const nombrePorAutor: Record<AutorDemo, string> = {
+    DIRECTIVO: USUARIOS_DEMO.DIRECTIVO_SOE.nombre,
+    PRECEPTOR: USUARIOS_DEMO.PRECEPTOR.nombre,
+    SOE: PROFESIONAL_SOE_DEMO.nombre,
+  };
+  await cargarSeguimientoDemo(
+    legajos,
+    (dni) => {
+      const id = idsPorDni.get(dni);
+      if (!id) throw new Error(`Alumno semilla inexistente: ${dni}`);
+      return id;
+    },
+    (autor) => idUsuario(nombrePorAutor[autor]),
+  );
+
   console.log("✓ Seed completo. Usuarios de prueba (contraseña = SEED_PASSWORD):");
   usuariosSemilla.forEach((u) => console.log(`  - ${u.email} (${u.rol})`));
+}
+
+/**
+ * Actuaciones, derivaciones, seguimientos, situaciones, fichas anexas y avisos de demostración.
+ * Se borran y se vuelven a crear (con ids fijos) solo para los alumnos de DNIS_SEGUIMIENTO_DEMO.
+ */
+async function cargarSeguimientoDemo(
+  legajos: LegajoFuente[],
+  idEstudiante: (dni: string) => string,
+  idUsuarioAutor: (autor: AutorDemo) => string,
+): Promise<void> {
+  const demo = crearSeguimientoDemo();
+  const estudianteIds = DNIS_SEGUIMIENTO_DEMO.map(idEstudiante);
+  const deEstos = { estudianteId: { in: estudianteIds } };
+  const fecha = (iso: string | null): Date | null => (iso ? new Date(iso) : null);
+
+  // Incidentes de convivencia ya creados arriba, para vincular la quita de puntos ICE.
+  const incidentesDemo = new Map(legajos.flatMap((l) => l.incidentes.map((i) => [i.id, { dni: l.dni, ...i }] as const)));
+  const idIncidente = async (incidenteDemoId: string | null): Promise<string | null> => {
+    if (!incidenteDemoId) return null;
+    const inc = incidentesDemo.get(incidenteDemoId);
+    if (!inc) throw new Error(`Incidente semilla inexistente: ${incidenteDemoId}`);
+    const enBase = await prisma.incidenteConvivencia.findFirst({
+      where: { estudianteId: idEstudiante(inc.dni), fecha: new Date(inc.fecha), motivo: inc.motivo },
+      select: { id: true },
+    });
+    return enBase?.id ?? null;
+  };
+
+  const actuaciones = await Promise.all(
+    demo.actuaciones.map(async (a) => ({
+      id: a.id,
+      estudianteId: idEstudiante(a.dni),
+      autorId: idUsuarioAutor(a.autor),
+      fecha: new Date(a.fecha),
+      cicloLectivo: a.cicloLectivo,
+      tipo: a.tipo,
+      motivo: a.motivo,
+      resumen: a.resumen,
+      tipoActa: a.tipoActa,
+      actaLibro: a.actaLibro,
+      actaFolio: a.actaFolio,
+      confidencial: a.confidencial,
+      puntosIce: a.puntosIce,
+      incidenteId: await idIncidente(a.incidenteDemoId),
+      derivacionId: a.derivacionId,
+    })),
+  );
+
+  await prisma.$transaction([
+    // Orden: primero lo que referencia a otros registros.
+    prisma.notificacion.deleteMany({ where: deEstos }),
+    prisma.seguimientoCaso.deleteMany({ where: deEstos }),
+    prisma.situacionEspecial.deleteMany({ where: deEstos }),
+    prisma.actuacion.deleteMany({ where: deEstos }),
+    prisma.derivacion.deleteMany({ where: deEstos }),
+    prisma.fichaAnexa.deleteMany({ where: deEstos }),
+    ...DNIS_SEGUIMIENTO_DEMO.map((dni) => {
+      const a = demo.aperturas.find((x) => x.dni === dni);
+      return prisma.estudiante.update({
+        where: { id: idEstudiante(dni) },
+        data: {
+          legajoAbiertoEl: fecha(a?.fecha ?? null),
+          motivoApertura: a?.motivo ?? null,
+          detalleApertura: a?.detalle ?? null,
+          aperturaPromedio: a?.promedio ?? null,
+          aperturaPendientes: a?.pendientes ?? null,
+          aperturaInasistencias: a?.inasistencias ?? null,
+          aperturaIce: a?.ice ?? null,
+        },
+      });
+    }),
+    prisma.derivacion.createMany({
+      data: demo.derivaciones.map((d) => ({
+        id: d.id,
+        estudianteId: idEstudiante(d.dni),
+        fecha: new Date(d.fecha),
+        derivadoPorId: idUsuarioAutor(d.derivadoPor),
+        motivo: d.motivo,
+        profesionalSoeId: d.profesionalSoe ? idUsuarioAutor(d.profesionalSoe) : null,
+        recibidaEl: fecha(d.recibidaEl),
+        accionesSoe: d.accionesSoe,
+        respuesta: d.respuesta,
+        destino: d.destino,
+        organismoExterno: d.organismoExterno,
+        estado: d.estado,
+        cerradaEl: fecha(d.cerradaEl),
+      })),
+    }),
+    prisma.actuacion.createMany({ data: actuaciones }),
+    prisma.situacionEspecial.createMany({
+      data: demo.situaciones.map((s) => ({
+        id: s.id,
+        estudianteId: idEstudiante(s.dni),
+        tipo: s.tipo,
+        forma: s.forma,
+        aval: s.aval,
+        estado: s.estado,
+        nivelAcceso: s.nivelAcceso,
+        fechaInicio: new Date(s.fechaInicio),
+        fechaVencimiento: fecha(s.fechaVencimiento),
+        fechaFin: fecha(s.fechaFin),
+        detalle: s.detalle ?? Prisma.JsonNull,
+        observaciones: s.observaciones,
+        actuacionId: s.actuacionId,
+        derivacionId: s.derivacionId,
+        registradaPorId: idUsuarioAutor(s.registradaPor),
+      })),
+    }),
+    prisma.seguimientoCaso.createMany({
+      data: demo.seguimientos.map((s) => ({
+        id: s.id,
+        estudianteId: idEstudiante(s.dni),
+        derivacionId: s.derivacionId,
+        situacionId: s.situacionId,
+        responsableId: s.responsable ? idUsuarioAutor(s.responsable) : null,
+        fechaProgramada: new Date(s.fechaProgramada),
+        descripcion: s.descripcion,
+        estado: s.estado,
+        realizadoEl: fecha(s.realizadoEl),
+        resultado: s.resultado,
+        avisoLue: s.avisoLue,
+        avisoCorreo: s.avisoCorreo,
+      })),
+    }),
+    prisma.fichaAnexa.createMany({
+      data: demo.fichas.map((f) => ({
+        id: f.id,
+        estudianteId: idEstudiante(f.dni),
+        tipo: f.tipo,
+        datos: f.datos,
+        cargadaPorId: idUsuarioAutor(f.cargadaPor),
+        createdAt: new Date(f.fecha),
+      })),
+    }),
+    prisma.notificacion.createMany({
+      data: demo.notificaciones.map((n) => ({
+        id: n.id,
+        usuarioId: idUsuarioAutor(n.para),
+        tipo: n.tipo,
+        titulo: n.titulo,
+        mensaje: n.mensaje,
+        estudianteId: idEstudiante(n.dni),
+        seguimientoId: n.seguimientoId,
+        derivacionId: n.derivacionId,
+        leida: n.leida,
+        createdAt: new Date(n.fecha),
+      })),
+    }),
+  ]);
+
+  console.log(
+    `✓ Seguimiento demo: ${demo.actuaciones.length} actuaciones, ${demo.derivaciones.length} derivaciones, ` +
+      `${demo.seguimientos.length} seguimientos, ${demo.situaciones.length} situaciones, ${demo.fichas.length} fichas anexas.`,
+  );
 }
 
 main()

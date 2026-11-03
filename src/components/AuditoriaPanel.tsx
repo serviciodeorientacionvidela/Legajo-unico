@@ -21,6 +21,13 @@ const ACCIONES: Record<AccionAuditoria, { etiqueta: string; tono: "azul" | "viol
   EDITAR_CONFIDENCIAL: { etiqueta: "Editó datos CUD / PPI", tono: "rojo" },
   GENERAR_INFORME: { etiqueta: "Generó informe", tono: "neutro" },
   GESTIONAR_USUARIO: { etiqueta: "Gestionó usuarios", tono: "ambar" },
+  CARGAR_ACTUACION: { etiqueta: "Registró actuación", tono: "ambar" },
+  CARGAR_DERIVACION: { etiqueta: "Derivación al SOE", tono: "violeta" },
+  REGISTRAR_SEGUIMIENTO: { etiqueta: "Registró seguimiento", tono: "violeta" },
+  GESTIONAR_SITUACION: { etiqueta: "Situación especial", tono: "ambar" },
+  VER_FICHA_ANEXA: { etiqueta: "Vio ficha anexa", tono: "rojo" },
+  EDITAR_FICHA_ANEXA: { etiqueta: "Editó ficha anexa", tono: "rojo" },
+  VER_REPORTE_RESTRINGIDO: { etiqueta: "Vio reporte restringido", tono: "rojo" },
 };
 
 export default function AuditoriaPanel({ abierto, onCerrar, cargar }: Props) {
