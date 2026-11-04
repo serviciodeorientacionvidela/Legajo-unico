@@ -169,7 +169,7 @@ function BotonLegajo({ dni, onVerLegajo }: { dni: string; onVerLegajo?: (dni: st
 // Pestañas
 // ---------------------------------------------------------------------------
 
-function TabResumen({ filas }: { filas: FilaInforme[] }) {
+function TabResumen({ filas, verGei }: { filas: FilaInforme[]; verGei: boolean }) {
   const total = resumenTotal(filas);
   const cursos = resumenPorCurso(filas);
   const verPuntos = total.bajoPuntos !== null;
@@ -177,8 +177,12 @@ function TabResumen({ filas }: { filas: FilaInforme[] }) {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <Kpi titulo="Matrícula" valor={num(total.matricula)} detalle={`${cursos.length} cursos`} />
-        <Kpi titulo="Promedio general" valor={total.promedio === null ? "—" : formatearNota(total.promedio)} detalle={`${total.sinNotas} sin notas cargadas`} />
-        <Kpi titulo="Asistencia media" valor={num(total.asistencia, "%")} detalle={`${total.bajaAsistencia} bajo ${UMBRAL_ASISTENCIA_RIESGO}%`} />
+        {verGei && (
+          <>
+            <Kpi titulo="Promedio general" valor={total.promedio === null ? "—" : formatearNota(total.promedio)} detalle={`${total.sinNotas} sin notas cargadas`} />
+            <Kpi titulo="Asistencia media" valor={num(total.asistencia, "%")} detalle={`${total.bajaAsistencia} bajo ${UMBRAL_ASISTENCIA_RIESGO}%`} />
+          </>
+        )}
         <Kpi
           titulo="En seguimiento"
           valor={num(total.enRiesgo)}
@@ -189,14 +193,16 @@ function TabResumen({ filas }: { filas: FilaInforme[] }) {
         {verPuntos ? (
           <Kpi titulo={`Bajo ${UMBRAL_ALERTA_PUNTOS} pts ICE`} valor={num(total.bajoPuntos)} detalle="Requieren intervención" alerta={(total.bajoPuntos ?? 0) > 0} />
         ) : (
-          <Kpi titulo="Con previas" valor={num(total.conPrevias)} detalle="Adeudan espacios" />
+          verGei && <Kpi titulo="Con previas" valor={num(total.conPrevias)} detalle="Adeudan espacios" />
         )}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel titulo="Distribución de notas del ciclo">
-          <Histograma columnas={distribucionNotas(filas)} />
-        </Panel>
+      <div className={`grid gap-5 ${verGei ? "lg:grid-cols-2" : ""}`}>
+        {verGei && (
+          <Panel titulo="Distribución de notas del ciclo">
+            <Histograma columnas={distribucionNotas(filas)} />
+          </Panel>
+        )}
         <Panel titulo="Estudiantes en seguimiento por curso">
           <BarrasHorizontales
             maximo={100}
@@ -220,12 +226,16 @@ function TabResumen({ filas }: { filas: FilaInforme[] }) {
                 <th>Curso</th>
                 <th>Turno</th>
                 <th className="text-right">Matrícula</th>
-                <th className="text-right">Promedio</th>
-                <th className="text-right">Asistencia</th>
-                <th className="text-right">Prom. &lt; 6</th>
-                <th className="text-right">Asist. &lt; 85%</th>
+                {verGei && (
+                  <>
+                    <th className="text-right">Promedio</th>
+                    <th className="text-right">Asistencia</th>
+                    <th className="text-right">Prom. &lt; 6</th>
+                    <th className="text-right">Asist. &lt; 85%</th>
+                  </>
+                )}
                 {verPuntos && <th className="text-right">ICE &lt; 10</th>}
-                <th className="text-right">Con previas</th>
+                {verGei && <th className="text-right">Con previas</th>}
                 <th className="text-right">CUD / PPI</th>
                 <th className="text-right">En seguimiento</th>
               </tr>
@@ -236,14 +246,18 @@ function TabResumen({ filas }: { filas: FilaInforme[] }) {
                   <td className="font-semibold">{etiquetaCurso(c.anio, c.division ?? "")}</td>
                   <td>{c.turno ?? "Mixto"}</td>
                   <td className="text-right tabular-nums">{c.matricula}</td>
-                  <td className={`text-right tabular-nums ${c.promedio !== null && c.promedio < UMBRAL_PROMEDIO_BAJO ? "font-bold text-red-700" : ""}`}>
-                    {c.promedio === null ? "—" : formatearNota(c.promedio)}
-                  </td>
-                  <td className="text-right tabular-nums">{num(c.asistencia, "%")}</td>
-                  <td className="text-right tabular-nums">{c.bajoPromedio}</td>
-                  <td className="text-right tabular-nums">{c.bajaAsistencia}</td>
+                  {verGei && (
+                    <>
+                      <td className={`text-right tabular-nums ${c.promedio !== null && c.promedio < UMBRAL_PROMEDIO_BAJO ? "font-bold text-red-700" : ""}`}>
+                        {c.promedio === null ? "—" : formatearNota(c.promedio)}
+                      </td>
+                      <td className="text-right tabular-nums">{num(c.asistencia, "%")}</td>
+                      <td className="text-right tabular-nums">{c.bajoPromedio}</td>
+                      <td className="text-right tabular-nums">{c.bajaAsistencia}</td>
+                    </>
+                  )}
                   {verPuntos && <td className="text-right tabular-nums">{c.bajoPuntos}</td>}
-                  <td className="text-right tabular-nums">{c.conPrevias}</td>
+                  {verGei && <td className="text-right tabular-nums">{c.conPrevias}</td>}
                   <td className="text-right tabular-nums">{c.conCudPpi}</td>
                   <td className="text-right font-semibold tabular-nums">
                     {c.enRiesgo} <span className="font-normal text-slate-500">({pct(c.enRiesgo, c.matricula)}%)</span>
@@ -255,12 +269,16 @@ function TabResumen({ filas }: { filas: FilaInforme[] }) {
                   Total institucional
                 </td>
                 <td className="text-right font-bold tabular-nums">{total.matricula}</td>
-                <td className="text-right font-bold tabular-nums">{total.promedio === null ? "—" : formatearNota(total.promedio)}</td>
-                <td className="text-right font-bold tabular-nums">{num(total.asistencia, "%")}</td>
-                <td className="text-right font-bold tabular-nums">{total.bajoPromedio}</td>
-                <td className="text-right font-bold tabular-nums">{total.bajaAsistencia}</td>
+                {verGei && (
+                  <>
+                    <td className="text-right font-bold tabular-nums">{total.promedio === null ? "—" : formatearNota(total.promedio)}</td>
+                    <td className="text-right font-bold tabular-nums">{num(total.asistencia, "%")}</td>
+                    <td className="text-right font-bold tabular-nums">{total.bajoPromedio}</td>
+                    <td className="text-right font-bold tabular-nums">{total.bajaAsistencia}</td>
+                  </>
+                )}
                 {verPuntos && <td className="text-right font-bold tabular-nums">{total.bajoPuntos}</td>}
-                <td className="text-right font-bold tabular-nums">{total.conPrevias}</td>
+                {verGei && <td className="text-right font-bold tabular-nums">{total.conPrevias}</td>}
                 <td className="text-right font-bold tabular-nums">{total.conCudPpi}</td>
                 <td className="text-right font-bold tabular-nums">{total.enRiesgo}</td>
               </tr>
@@ -878,6 +896,8 @@ export default function InformesPanel({ cargar, emisor, onVerLegajo, onError }: 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState<Pestana>("resumen");
+  // Notas y asistencia viven en el GEI: se muestran solo si se piden expresamente.
+  const [verGei, setVerGei] = useState(false);
   const [anio, setAnio] = useState<number | null>(null);
   const [division, setDivision] = useState("");
   const { imprimiendo, imprimir } = useImpresion();
@@ -899,7 +919,10 @@ export default function InformesPanel({ cargar, emisor, onVerLegajo, onError }: 
   }, [actualizar]);
 
   const pestanas = PESTANAS.filter(
-    (p) => (p.id !== "convivencia" || datos?.incidentes != null) && (p.id !== "soe" || datos?.intervenciones != null),
+    (p) =>
+      (p.id !== "convivencia" || datos?.incidentes != null) &&
+      (p.id !== "soe" || datos?.intervenciones != null) &&
+      (p.id !== "materias" || verGei),
   );
 
   const enFiltro = useCallback(
@@ -922,7 +945,7 @@ export default function InformesPanel({ cargar, emisor, onVerLegajo, onError }: 
     const verLegajo = conAcciones ? onVerLegajo : undefined;
     switch (pestana) {
       case "resumen":
-        return <TabResumen filas={filas} />;
+        return <TabResumen filas={filas} verGei={verGei} />;
       case "materias":
         return <TabMaterias filas={filas} />;
       case "riesgo":
@@ -960,6 +983,19 @@ export default function InformesPanel({ cargar, emisor, onVerLegajo, onError }: 
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        aria-pressed={verGei}
+        onClick={() => {
+          if (verGei && pestana === "materias") setPestana("resumen");
+          setVerGei((v) => !v);
+        }}
+        className={`ml-2 rounded-full px-3.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition print:hidden ${
+          verGei ? "bg-institucional-600 text-white ring-institucional-600" : "bg-white text-slate-600 ring-slate-200 hover:bg-institucional-50"
+        }`}
+      >
+        {verGei ? "Ocultar notas y asistencia (GEI)" : "Mostrar notas y asistencia (GEI)"}
+      </button>
 
       <div className="flex flex-wrap items-center gap-2">
         <select
