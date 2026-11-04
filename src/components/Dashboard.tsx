@@ -43,6 +43,7 @@ import ImportGeiModal from "./ImportGeiModal";
 import IncidenteModal from "./IncidenteModal";
 import InformeLegajoModal from "./InformeLegajoModal";
 import InformesPanel from "./InformesPanel";
+import SeguimientoPanel from "./SeguimientoPanel";
 import IntervencionModal from "./IntervencionModal";
 import LegajoDetalle from "./LegajoDetalle";
 import MetricCards, { type FiltroRapido } from "./MetricCards";
@@ -50,54 +51,6 @@ import RoleSimulator from "./RoleSimulator";
 import SessionTimeoutGuard from "./SessionTimeoutGuard";
 import StudentTable from "./StudentTable";
 import UsuariosPanel from "./UsuariosPanel";
-
-type Acceso = "total" | "parcial" | "ninguno";
-
-/** Matriz institucional de permisos, tal como se presenta a Dirección. */
-const MATRIZ_PERMISOS: { modulo: string; acceso: Record<Rol, [Acceso, string]> }[] = [
-  {
-    modulo: "Datos biográficos y curso",
-    acceso: { DOCENTE: ["parcial", "Lectura"], PRECEPTOR: ["parcial", "Lectura / Edición"], DIRECTIVO_SOE: ["total", "Control total"] },
-  },
-  {
-    modulo: "Calificaciones, promedios y asistencias",
-    acceso: { DOCENTE: ["parcial", "Lectura"], PRECEPTOR: ["parcial", "Lectura"], DIRECTIVO_SOE: ["total", "Control total"] },
-  },
-  {
-    modulo: "Indicador CUD / PPI",
-    acceso: {
-      DOCENTE: ["parcial", "Solo Sí/No"],
-      PRECEPTOR: ["parcial", "Solo Sí/No"],
-      DIRECTIVO_SOE: ["total", "Diagnóstico y PDF"],
-    },
-  },
-  {
-    modulo: "Régimen de convivencia",
-    acceso: {
-      DOCENTE: ["ninguno", "Sin acceso"],
-      PRECEPTOR: ["parcial", "Carga y lectura"],
-      DIRECTIVO_SOE: ["total", "Aprobación, quita y baja"],
-    },
-  },
-  {
-    modulo: "Informes SOE y carpeta confidencial",
-    acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["ninguno", "Sin acceso"], DIRECTIVO_SOE: ["total", "Control total"] },
-  },
-  {
-    modulo: "Informes institucionales y exportación",
-    acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["parcial", "Generación"], DIRECTIVO_SOE: ["total", "Generación (incluye SOE)"] },
-  },
-  {
-    modulo: "Auditoría y sincronización GEI",
-    acceso: { DOCENTE: ["ninguno", "Sin acceso"], PRECEPTOR: ["ninguno", "Sin acceso"], DIRECTIVO_SOE: ["total", "Control total"] },
-  },
-];
-
-const COLOR_ACCESO: Record<Acceso, string> = {
-  total: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  parcial: "bg-institucional-50 text-institucional-700 ring-institucional-100",
-  ninguno: "bg-slate-100 text-slate-500 ring-slate-200",
-};
 
 function useDiferido<T>(valor: T, demoraMs: number): T {
   const [diferido, setDiferido] = useState(valor);
@@ -193,7 +146,6 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [division, setDivision] = useState("");
   const [alertaPuntos, setAlertaPuntos] = useState(false);
   const [conCud, setConCud] = useState(false);
-  const [promedioBajo, setPromedioBajo] = useState(false);
   const puedeVerConvivencia = rol !== null && tienePermiso(rol, "VER_CONVIVENCIA");
 
   const filtros = useMemo<FiltrosEstudiantes>(
@@ -203,9 +155,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       division: division || undefined,
       alertaPuntos: alertaPuntos && puedeVerConvivencia,
       conCud,
-      promedioBajo,
     }),
-    [busquedaDiferida, anio, division, alertaPuntos, puedeVerConvivencia, conCud, promedioBajo],
+    [busquedaDiferida, anio, division, alertaPuntos, puedeVerConvivencia, conCud],
   );
 
   const aplicarFiltroRapido = (filtro: FiltroRapido) => {
@@ -214,7 +165,6 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     setDivision("");
     setAlertaPuntos(filtro === "convivencia");
     setConCud(filtro === "cud");
-    setPromedioBajo(filtro === "riesgo");
   };
 
   // --- Listado ----------------------------------------------------------------
@@ -278,7 +228,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [modalIntervencion, setModalIntervencion] = useState(false);
   const [modalConfidencial, setModalConfidencial] = useState(false);
   const [modalInforme, setModalInforme] = useState(false);
-  const [vista, setVista] = useState<"estudiantes" | "informes" | "usuarios">("estudiantes");
+  const [vista, setVista] = useState<"estudiantes" | "informes" | "usuarios" | "seguimiento">("estudiantes");
+  useEffect(() => { if (new URLSearchParams(window.location.search).has("seguimiento")) setVista("seguimiento"); }, []);
 
   const cargarLegajo = useCallback(
     async (dni: string, silencioso = false) => {
@@ -485,6 +436,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         </div>
 
         <nav aria-label="Secciones" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:block lg:space-y-1 lg:pb-0">
+          {rol !== "DOCENTE" && <BotonMenu activo={vista === "seguimiento"} onClick={() => setVista("seguimiento")} icono={<ClipboardList className="h-4 w-4" aria-hidden />}>Seguimiento LUE</BotonMenu>}
           <BotonMenu activo={vista === "estudiantes"} onClick={() => setVista("estudiantes")} icono={<Users className="h-4 w-4" aria-hidden />}>
             Estudiantes
           </BotonMenu>
@@ -540,7 +492,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div>
             <h2 className="text-lg font-bold text-institucional-950">
-              {vista === "informes" ? "Informes" : vista === "usuarios" ? "Usuarios" : "Estudiantes"}
+              {vista === "seguimiento" ? "Seguimiento LUE" : vista === "informes" ? "Informes" : vista === "usuarios" ? "Usuarios" : "Estudiantes"}
             </h2>
             <p className="text-xs text-slate-500">
               {vista === "informes"
@@ -592,7 +544,9 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       )}
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-        {vista === "usuarios" && esAdministrador ? (
+        {vista === "seguimiento" && rol !== "DOCENTE" ? (
+          <SeguimientoPanel modoDemo={modoDemo} rol={rol} administrador={esAdministrador} />
+        ) : vista === "usuarios" && esAdministrador ? (
           <UsuariosPanel
             usuarioActualId={usuario.id}
             onAviso={(texto) => setAviso({ texto, tono: "ok" })}
@@ -605,27 +559,6 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         <>
         <MetricCards metricas={metricas} onFiltroRapido={aplicarFiltroRapido} />
 
-        <details className="tarjeta group">
-          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700">
-            <ShieldCheck className="h-4 w-4 text-institucional-600" aria-hidden />
-            Permisos de su rol: {ROL_ETIQUETA[rol]}
-            <span className="ml-auto text-xs text-slate-400 group-open:hidden">Ver matriz</span>
-          </summary>
-          <div className="grid gap-2 border-t border-slate-100 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
-            {MATRIZ_PERMISOS.map(({ modulo, acceso }) => {
-              const [nivel, texto] = acceso[rol];
-              return (
-                <div key={modulo} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
-                  <span className="text-xs text-slate-700">{modulo}</span>
-                  <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${COLOR_ACCESO[nivel]}`}>
-                    {texto}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-[16rem] flex-1">
@@ -634,7 +567,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
                 type="search"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por DNI o apellido…"
+                placeholder="Buscar por DNI o apellido para abrir el legajo…"
                 aria-label="Buscar estudiante por DNI o apellido"
                 className="campo-pildora pl-10"
               />
@@ -671,10 +604,12 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
             <Chip activo={conCud} onClick={() => setConCud((v) => !v)}>
               Posee CUD
             </Chip>
-            <Chip activo={promedioBajo} onClick={() => setPromedioBajo((v) => !v)}>
-              Promedio bajo (&lt; 6)
-            </Chip>
           </div>
+
+          <p className="text-xs text-slate-500">
+            Notas, asistencia y trayectoria se consultan en el GEI. El legajo se abre solo cuando una situación lo amerita
+            (riesgo de condicionalidad, ICE, faltas graves, CUD, federados, situaciones especiales).
+          </p>
 
           {errorLista ? (
             <p className="rounded-2xl bg-red-50 px-4 py-2.5 text-sm text-red-700 ring-1 ring-inset ring-red-200">{errorLista}</p>

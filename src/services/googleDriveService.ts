@@ -13,7 +13,8 @@
  * propia en "Mi unidad"). Todas las llamadas usan supportsAllDrives para funcionar en ambos casos.
  */
 
-import { google, type drive_v3 } from "googleapis";
+// Importar solo Drive evita cargar los tipos de cientos de APIs durante la compilación.
+import { auth as googleAuth, drive_v3 } from "googleapis/build/src/apis/drive";
 import {
   NOMBRE_CARPETA_RAIZ,
   nombreCarpetaAnio,
@@ -60,13 +61,13 @@ function obtenerDrive(): drive_v3.Drive {
   if (!email || !clave) {
     throw new Error("Google Drive no configurado: faltan GOOGLE_SERVICE_ACCOUNT_EMAIL o GOOGLE_PRIVATE_KEY.");
   }
-  const auth = new google.auth.JWT({
+  const auth = new googleAuth.JWT({
     email,
     // En variables de entorno la clave viaja con "\n" literales.
     key: clave.replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
-  clienteDrive = google.drive({ version: "v3", auth });
+  clienteDrive = new drive_v3.Drive({ auth });
   return clienteDrive;
 }
 

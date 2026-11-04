@@ -2,8 +2,7 @@
 
 import { ChevronRight, Loader2 } from "lucide-react";
 import { nivelAlertaPuntos, PUNTOS_INICIALES } from "@/lib/convivencia";
-import { etiquetaCurso, formatearNota } from "@/lib/formato";
-import { UMBRAL_ASISTENCIA_RIESGO, UMBRAL_PROMEDIO_BAJO } from "@/lib/rbac";
+import { etiquetaCurso } from "@/lib/formato";
 import type { EstudianteResumen } from "@/lib/types";
 import { Insignia } from "./ui";
 
@@ -46,9 +45,7 @@ export default function StudentTable({ estudiantes, total, cargando, mostrarPunt
             <tr>
               <th scope="col" className="px-4 py-3">Estudiante</th>
               <th scope="col" className="px-4 py-3">Curso</th>
-              <th scope="col" className="px-4 py-3 text-right">Promedio</th>
-              <th scope="col" className="px-4 py-3 text-right">Asistencia</th>
-              {mostrarPuntos && <th scope="col" className="px-4 py-3">Convivencia</th>}
+              {mostrarPuntos && <th scope="col" className="px-4 py-3">Puntos ICE (GEI)</th>}
               <th scope="col" className="px-4 py-3">Indicadores</th>
               <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th>
             </tr>
@@ -70,16 +67,6 @@ export default function StudentTable({ estudiantes, total, cargando, mostrarPunt
                   {etiquetaCurso(e.anio, e.division)}
                   <div className="text-xs text-slate-500">{e.turno}</div>
                 </td>
-                <td
-                  className={`px-4 py-3 text-right tabular-nums ${e.promedioGeneral < UMBRAL_PROMEDIO_BAJO ? "font-semibold text-red-700" : "text-slate-700"}`}
-                >
-                  {formatearNota(e.promedioGeneral)}
-                </td>
-                <td
-                  className={`px-4 py-3 text-right tabular-nums ${e.porcentajeAsistencia < UMBRAL_ASISTENCIA_RIESGO ? "font-semibold text-red-700" : "text-slate-700"}`}
-                >
-                  {e.porcentajeAsistencia.toLocaleString("es-AR")}%
-                </td>
                 {mostrarPuntos && (
                   <td className="px-4 py-3">{e.puntosConvivencia !== null && <BarraPuntos puntos={e.puntosConvivencia} />}</td>
                 )}
@@ -87,11 +74,6 @@ export default function StudentTable({ estudiantes, total, cargando, mostrarPunt
                   <div className="flex flex-wrap gap-1">
                     {e.tieneCud && <Insignia tono="violeta" titulo="Posee Certificado Único de Discapacidad">CUD</Insignia>}
                     {e.requierePpi && <Insignia tono="azul" titulo="Requiere Proyecto Pedagógico Individual">PPI</Insignia>}
-                    {e.materiasPrevias > 0 && (
-                      <Insignia tono="ambar">
-                        {e.materiasPrevias} previa{e.materiasPrevias > 1 ? "s" : ""}
-                      </Insignia>
-                    )}
                     {e.estadoMatricula !== "REGULAR" && <Insignia tono="neutro">{e.estadoMatricula}</Insignia>}
                   </div>
                 </td>

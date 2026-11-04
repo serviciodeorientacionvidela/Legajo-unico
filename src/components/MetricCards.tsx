@@ -1,10 +1,10 @@
 "use client";
 
-import { Accessibility, Lock, ShieldAlert, TrendingDown, Users } from "lucide-react";
+import { Accessibility, Lock, ShieldAlert, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MetricasInstitucionales } from "@/lib/types";
 
-export type FiltroRapido = "todos" | "cud" | "convivencia" | "riesgo";
+export type FiltroRapido = "todos" | "cud" | "convivencia";
 
 interface Props {
   metricas: MetricasInstitucionales | null;
@@ -55,7 +55,7 @@ function Tarjeta({
 
 export default function MetricCards({ metricas, onFiltroRapido }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <Tarjeta
         titulo="Matrícula total"
         valor={metricas?.matriculaTotal}
@@ -80,14 +80,6 @@ export default function MetricCards({ metricas, onFiltroRapido }: Props) {
         color="bg-amber-50"
         bloqueada={metricas !== null && metricas.alertasConvivencia === null}
         onClick={() => onFiltroRapido("convivencia")}
-      />
-      <Tarjeta
-        titulo="Riesgo pedagógico"
-        valor={metricas?.riesgoPedagogico}
-        detalle="Promedio < 6 o asistencia < 85%"
-        icono={<TrendingDown className="h-5 w-5 text-red-700" />}
-        color="bg-red-50"
-        onClick={() => onFiltroRapido("riesgo")}
       />
     </div>
   );

@@ -35,6 +35,7 @@ import {
   type TipoIncidente,
 } from "@/lib/types";
 import { GraficoAsistenciaMensual, GraficoMaterias, GraficoPromediosPorCiclo, IndicadoresLegajo } from "./LegajoGraficos";
+import SeguimientoLegajo from "./SeguimientoLegajo";
 import { Bloqueado, Insignia, MensajeError, Seccion } from "./ui";
 
 interface Props {
@@ -310,9 +311,10 @@ export default function LegajoDetalle({
               )}
 
               <IndicadoresLegajo legajo={legajo} />
+              {rol !== "DOCENTE" && <SeguimientoLegajo key={`${e.dni}-${rol}`} dni={e.dni} modoDemo={modoDemo} rol={rol} />}
 
               {(e.tieneCud || e.requierePpi || tienePermiso(rol, "EDITAR_DATOS_CONFIDENCIALES")) && (
-                <Seccion
+              <Seccion
                   titulo="Inclusión y apoyos"
                   icono={<Accessibility className="h-4 w-4 text-violet-600" aria-hidden />}
                   accion={

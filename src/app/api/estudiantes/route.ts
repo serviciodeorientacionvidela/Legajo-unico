@@ -1,3 +1,4 @@
+import { seguimientoHabilitado, obtenerPerfil, filtroCurso, restringirCursoExistente } from "@/lib/seguimiento/permisos";
 import { z } from "zod";
 import { DNI_REGEX, jsonConSesion, manejarError, requerirSesion } from "@/lib/api";
 import { construirFiltroEstudiantes, obtenerMetricas } from "@/lib/consultas";
@@ -38,7 +39,8 @@ export async function GET(req: Request) {
     // El filtro por puntos revela información del régimen de convivencia.
     if (filtros.alertaPuntos) exigirPermiso(usuario.rol, "VER_CONVIVENCIA");
 
-    const where = construirFiltroEstudiantes(filtros);
+    const alcance = seguimientoHabilitado() && usuario.rol === "PRECEPTOR" ? filtroCurso(await obtenerPerfil(usuario)) : {};
+    const where = { AND: [construirFiltroEstudiantes(filtros), alcance] };
     const [filas, total, metricas] = await Promise.all([
       prisma.estudiante.findMany({
         where,
@@ -48,7 +50,7 @@ export async function GET(req: Request) {
         include: { _count: { select: { calificaciones: { where: { previa: true } } } } },
       }),
       prisma.estudiante.count({ where }),
-      obtenerMetricas(usuario.rol),
+      obtenerMetricas(usuario.rol, alcance),
     ]);
 
     const estudiantes = filas.map(({ _count, ...e }) =>
@@ -123,8 +125,11 @@ export async function POST(req: Request) {
 
     const previo = await prisma.estudiante.findUnique({
       where: { dni: datos.dni },
-      select: { anio: true, division: true, driveFolderId: true },
+      select: { anio: true, division: true, turno: true, driveFolderId: true },
     });
+
+    if (previo) await restringirCursoExistente(usuario, previo);
+    await restringirCursoExistente(usuario, biograficos);
 
     let estudiante = await prisma.estudiante.upsert({
       where: { dni: datos.dni },

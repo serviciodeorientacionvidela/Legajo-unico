@@ -1,3 +1,4 @@
+import { seguimientoHabilitado, obtenerPerfil, exigirDireccion, restringirCursoExistente } from "@/lib/seguimiento/permisos";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { ApiError, DNI_REGEX, jsonConSesion, manejarError, obtenerIp, requerirSesion } from "@/lib/api";
@@ -58,15 +59,16 @@ export async function POST(req: Request) {
     const fecha = datos.fecha ?? new Date();
     if (fecha.getTime() > Date.now() + 60_000) throw new ApiError(400, "La fecha del incidente no puede ser futura.");
 
-    const apruebaDirecto = tienePermiso(usuario.rol, "APROBAR_INCIDENTE");
+    const apruebaDirecto = seguimientoHabilitado() ? (await obtenerPerfil(usuario)).funcion === "DIRECCION" : tienePermiso(usuario.rol, "APROBAR_INCIDENTE");
 
     const resultado = await prisma.$transaction(async (tx) => {
       const estudiante = await tx.estudiante.findUnique({
         where: { dni: datos.dni },
-        select: { id: true, puntosConvivencia: true },
+        select: { id: true, puntosConvivencia: true, anio: true, division: true, turno: true },
       });
       if (!estudiante) throw new ApiError(404, "No existe un estudiante con ese DNI.");
 
+      await restringirCursoExistente(usuario, estudiante);
       const puntos = datos.puntosDescontados;
       const actualizado = estudiante;
 
@@ -122,6 +124,7 @@ export async function PATCH(req: Request) {
   try {
     const usuario = await requerirSesion();
     exigirPermiso(usuario.rol, "APROBAR_INCIDENTE");
+    if (seguimientoHabilitado()) exigirDireccion(await obtenerPerfil(usuario));
     const { incidenteId, accion } = esquemaResolucion.parse(await req.json());
 
     const resultado = await prisma.$transaction(async (tx) => {

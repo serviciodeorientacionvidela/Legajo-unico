@@ -97,6 +97,11 @@ enum EstadoSeguimiento {
 }
 
 enum TipoSituacion {
+  CUD_EVALUACION
+  INGRESANTE
+  SALIDA
+  NO_ASISTE
+  CONDICIONAL_ICE
   ESCOLARIDAD_PROTEGIDA
   DEPORTISTA_FEDERADO
   CONDICIONAL_INASISTENCIAS
@@ -142,6 +147,7 @@ enum TipoNotificacion {
 }
 
 model Usuario {
+  perfilSeguimiento PerfilSeguimiento?
   id              String    @id @default(cuid())
   email           String    @unique
   nombre          String
@@ -170,6 +176,7 @@ model Usuario {
 }
 
 model Estudiante {
+  aperturaTrayectoria Json?
   id                   String    @id @default(cuid())
   dni                  String    @unique
   cuil                 String?
@@ -399,6 +406,9 @@ model AuditLog {
  * El registro digital es un índice: el acta original sigue en el libro de actas.
  */
 model Actuacion {
+  anuladaEl DateTime?
+  anuladaPorId String?
+  motivoAnulacion String?
   id           String        @id @default(cuid())
   estudianteId String
   estudiante   Estudiante    @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
@@ -437,6 +447,14 @@ model Actuacion {
 
   @@index([estudianteId, fecha])
   @@index([estudianteId, cicloLectivo])
+}
+
+// Permisos explícitos del circuito LUE. No se infiere dirección de ser administrador.
+model PerfilSeguimiento {
+  usuarioId String @id
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  funcion String // DIRECCION, SOE o PRECEPTORIA
+  cursos Json // [{anio: 3, division: "1", turno: "Mañana"}]
 }
 
 /**

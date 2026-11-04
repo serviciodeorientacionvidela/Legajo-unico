@@ -44,8 +44,8 @@ export function construirFiltroEstudiantes(filtros: FiltrosEstudiantes): Prisma.
   return condiciones.length > 0 ? { AND: condiciones } : {};
 }
 
-export async function obtenerMetricas(rol: Rol): Promise<MetricasInstitucionales> {
-  const regulares: Prisma.EstudianteWhereInput = { estadoMatricula: "REGULAR" };
+export async function obtenerMetricas(rol: Rol, alcance: Prisma.EstudianteWhereInput = {}): Promise<MetricasInstitucionales> {
+  const regulares: Prisma.EstudianteWhereInput = { AND: [alcance], estadoMatricula: "REGULAR" };
   const [matriculaTotal, conCudOPpi, alertasConvivencia, riesgoPedagogico] = await Promise.all([
     prisma.estudiante.count({ where: regulares }),
     prisma.estudiante.count({ where: { ...regulares, OR: [{ tieneCud: true }, { requierePpi: true }] } }),

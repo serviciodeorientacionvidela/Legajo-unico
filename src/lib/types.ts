@@ -121,6 +121,7 @@ export const ESTADOS_SEGUIMIENTO = ["PROGRAMADO", "REALIZADO", "CANCELADO"] as c
 export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
 
 export const TIPOS_SITUACION = [
+  "CUD_EVALUACION", "INGRESANTE", "SALIDA", "NO_ASISTE", "CONDICIONAL_ICE",
   "ESCOLARIDAD_PROTEGIDA",
   "DEPORTISTA_FEDERADO",
   "CONDICIONAL_INASISTENCIAS",
@@ -135,6 +136,7 @@ export const TIPOS_SITUACION = [
 export type TipoSituacion = (typeof TIPOS_SITUACION)[number];
 
 export const TIPO_SITUACION_ETIQUETA: Record<TipoSituacion, string> = {
+  CUD_EVALUACION: "CUD o evaluación de capacidades", INGRESANTE: "Ingreso de otra institución", SALIDA: "Pase o abandono", NO_ASISTE: "Matriculado que no asiste", CONDICIONAL_ICE: "Condicionalidad por ICE",
   ESCOLARIDAD_PROTEGIDA: "Escolaridad protegida",
   DEPORTISTA_FEDERADO: "Deportista federado (Res. 711/2024)",
   CONDICIONAL_INASISTENCIAS: "Condicional por inasistencias",
@@ -149,6 +151,7 @@ export const TIPO_SITUACION_ETIQUETA: Record<TipoSituacion, string> = {
 
 /** Nivel de acceso por defecto de cada tipo (reportes 5, 6 y 10 restringidos; 9 solo dirección). */
 export const NIVEL_ACCESO_SITUACION: Record<TipoSituacion, NivelAcceso> = {
+  CUD_EVALUACION: "RESTRINGIDO", INGRESANTE: "GENERAL", SALIDA: "GENERAL", NO_ASISTE: "GENERAL", CONDICIONAL_ICE: "GENERAL",
   ESCOLARIDAD_PROTEGIDA: "GENERAL",
   DEPORTISTA_FEDERADO: "GENERAL",
   CONDICIONAL_INASISTENCIAS: "GENERAL",

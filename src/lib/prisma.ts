@@ -14,6 +14,7 @@ function crearPrisma() {
     // la base. Al habilitar seguimiento, retirar esta omisión tras la migración.
     omit: {
       estudiante: {
+        aperturaTrayectoria: true,
         legajoAbiertoEl: true,
         motivoApertura: true,
         detalleApertura: true,

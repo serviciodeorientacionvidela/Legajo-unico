@@ -1,3 +1,4 @@
+import { seguimientoHabilitado, obtenerPerfil, filtroCurso, restringirCursoExistente } from "@/lib/seguimiento/permisos";
 import { z } from "zod";
 import { ApiError, DNI_REGEX, jsonConSesion, manejarError, obtenerIp, requerirSesion } from "@/lib/api";
 import { registrarAuditoria, registrarAuditorias } from "@/lib/audit";
@@ -22,6 +23,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ dni: str
     if (!DNI_REGEX.test(dni)) throw new ApiError(400, "DNI inválido.");
 
     const legajo = await prisma.estudiante.findUnique({ where: { dni }, include: INCLUDE_LEGAJO });
+
+    if (legajo) await restringirCursoExistente(usuario, legajo);
 
     const acciones: AccionAuditoria[] = ["VER_LEGAJO"];
     if (legajo && expusoDatosConfidenciales(legajo, usuario.rol)) acciones.push("VER_CUD_SOE");

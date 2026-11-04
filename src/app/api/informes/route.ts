@@ -1,3 +1,4 @@
+import { seguimientoHabilitado, obtenerPerfil, filtroCurso, restringirCursoExistente } from "@/lib/seguimiento/permisos";
 import { z } from "zod";
 import { ApiError, DNI_REGEX, jsonConSesion, manejarError, obtenerIp, requerirSesion } from "@/lib/api";
 import { registrarAuditoria } from "@/lib/audit";
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
     const verConvivencia = tienePermiso(usuario.rol, "VER_CONVIVENCIA");
 
     const legajos = await prisma.estudiante.findMany({
-      where: { estadoMatricula: "REGULAR" },
+      where: { estadoMatricula: "REGULAR", AND: [seguimientoHabilitado() && usuario.rol === "PRECEPTOR" ? filtroCurso(await obtenerPerfil(usuario)) : {}] },
       include: {
         calificaciones: true,
         trayectoria: true,
