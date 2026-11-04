@@ -1,4 +1,4 @@
-﻿# Circuito LUE implementado — 03/11/2026
+# Circuito LUE implementado — 03/11/2026
 
 Referencia: documento «LUE – Funcionamiento, procedimiento de apertura y circuito de comunicación», y seis capturas aportadas por la escuela. Las normas citadas se toman como contexto del documento; esta implementación no sustituye su validación institucional.
 

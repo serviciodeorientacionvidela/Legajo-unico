@@ -1,4 +1,4 @@
-﻿import { config } from "dotenv";
+import { config } from "dotenv";
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 config({ path: ".env.local" });

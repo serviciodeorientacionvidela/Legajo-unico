@@ -1,4 +1,4 @@
-﻿import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { procesarAvisos } from "@/lib/seguimiento/avisos";
 import { seguimientoHabilitado } from "@/lib/seguimiento/permisos";
