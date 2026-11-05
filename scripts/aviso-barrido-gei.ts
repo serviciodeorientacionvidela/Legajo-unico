@@ -25,7 +25,10 @@ async function main(): Promise<void> {
     throw new Error("Uso: tsx scripts/aviso-barrido-gei.ts --ok|--error <ruta-del-log>");
   }
   const exito = modo === "--ok";
-  const log = await readFile(rutaLog, "utf8").catch(() => "");
+  // PowerShell 5.1 (Tee-Object) escribe el registro en UTF-16; se detecta por la marca BOM.
+  const bytes = await readFile(rutaLog).catch(() => Buffer.alloc(0));
+  const log =
+    bytes[0] === 0xff && bytes[1] === 0xfe ? bytes.subarray(2).toString("utf16le") : bytes.toString("utf8");
   const resumen = log
     .split(/\r?\n/)
     .map((l) => l.trim())

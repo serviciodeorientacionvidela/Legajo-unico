@@ -225,6 +225,8 @@ model Estudiante {
   driveDocumentacionFolderId String?
   driveConvivenciaFolderId   String?
   driveConfidencialFolderId  String?
+  /// Huella de la última ficha importada del GEI: si no cambió, el barrido no la reescribe.
+  fichaGeiHash               String?
 
   estadoMatricula EstadoMatricula @default(REGULAR)
   updatedAt       DateTime        @updatedAt

@@ -268,15 +268,22 @@ async function importar(
     // Después de la matrícula, que no trae el turno.
     if (turnos.length > 0) console.log(`📊 Turnos: ${await actualizarTurnosGei(turnos)} alumnos actualizados`);
     if (fichas.length > 0) {
-      const f = await importarFichasGei(fichas, { usuarioId: responsable.id, cicloLectivo: CICLO, ipAddress: "gei-scraper" });
-      console.log(`📊 Fichas: ${f.alumnosActualizados} alumnos · ${f.ciclosTrayectoria} ciclos de trayectoria · ${f.alertasTempranas} alertas tempranas`);
+      console.log(`
+→ Guardando ${fichas.length} fichas (solo las que cambiaron)…`);
+      const f = await importarFichasGei(fichas, {
+        usuarioId: responsable.id,
+        cicloLectivo: CICLO,
+        ipAddress: "gei-scraper",
+        progreso: (m) => console.log(m),
+      });
+      console.log(`📊 Fichas: ${f.alumnosActualizados} actualizadas · ${f.sinCambios} sin cambios · ${f.ciclosTrayectoria} ciclos de trayectoria · ${f.alertasTempranas} alertas tempranas`);
       console.log(`   PAD: ${f.faltasIce} faltas ICE · ${f.mesesAsistencia} meses de asistencia`);
       if (f.sinEstudiante > 0) console.warn(`   ⚠ ${f.sinEstudiante} fichas de alumnos que no están en la base`);
     }
     for (const { ciclo, evaluaciones: notasCiclo } of historial) {
       const h = await importarPlanillasGei(
         { asistencias: [], evaluaciones: notasCiclo },
-        { usuarioId: responsable.id, cicloLectivo: ciclo, cicloAnterior: true, ipAddress: "gei-scraper" },
+        { usuarioId: responsable.id, cicloLectivo: ciclo, cicloAnterior: true, ipAddress: "gei-scraper", progreso: (m) => console.log(m) },
       );
       console.log(`📊 Notas ${ciclo}: ${h.calificacionesActualizadas} materias-alumno (${h.sinCruzar.length} filas de alumnos que ya no están)`);
       h.errores.forEach((e) => console.warn(`   ✗ ${e}`));
@@ -286,6 +293,8 @@ async function importar(
   }
 
   async function importarMatriculaYPlanillas(matricula: ArchivoDescargado, usuarioId: string) {
+    console.log(`
+→ Guardando matrícula y carpetas de Drive…`);
     const m = await importarArchivoGei(matricula.datos, {
       usuarioId,
       nombreArchivo: matricula.nombre,
@@ -299,13 +308,16 @@ async function importar(
     m.advertencias.forEach((a) => console.warn(`   ⚠ ${a}`));
     m.errores.forEach((e) => console.warn(`   ✗ [fila ${e.fila}] ${e.motivo.replace(/\d{7,8}/g, "<dni>")}`));
 
+    console.log(`
+→ Guardando asistencia y notas (solo lo que cambió)…`);
     const p = await importarPlanillasGei({ asistencias, evaluaciones }, {
       usuarioId,
       cicloLectivo: CICLO,
       ipAddress: "gei-scraper",
+      progreso: (m) => console.log(m),
     });
     console.log(`📊 Asistencia anual actualizada: ${p.asistenciasActualizadas} alumnos`);
-    console.log(`📊 Notas: ${p.calificacionesActualizadas} materias-alumno`);
+    console.log(`📊 Notas: ${p.calificacionesActualizadas} cambios de ${p.calificacionesRevisadas} revisadas`);
     p.errores.forEach((e) => console.warn(`   ✗ ${e}`));
     if (p.sinCruzar.length > 0) {
       console.warn(`   ⚠ ${p.sinCruzar.length} filas de notas sin cruzar por nombre (alumnos que no están en la matrícula regular):`);

@@ -60,7 +60,7 @@ Add-Content -Path $log -Encoding UTF8 -Value ("Barrido iniciado " + (Get-Date -F
 # 4. Barrido. Las notas de ciclos anteriores no cambian: se omiten (más rápido).
 Write-Host ""
 Write-Host "  Barriendo el GEI. No cierre esta ventana (tarda entre 20 y 60 minutos)..." -ForegroundColor Yellow
-cmd.exe /c "npm run gei:scrape -- --sin-historial 2>&1" | Tee-Object -FilePath $log -Append
+cmd.exe /c "npm run gei:scrape -- --sin-historial 2>&1" | ForEach-Object { Write-Host $_; Add-Content -Path $log -Value $_ -Encoding UTF8 }
 $exito = ($LASTEXITCODE -eq 0)
 
 # Borrar las credenciales de la memoria del proceso.
@@ -69,7 +69,7 @@ Remove-Item Env:GEI_USER -ErrorAction SilentlyContinue
 
 # 5. Aviso en el sistema (lo ve Dirección al ingresar).
 $modo = $(if ($exito) { "--ok" } else { "--error" })
-cmd.exe /c "npx tsx scripts/aviso-barrido-gei.ts $modo `"$log`" 2>&1" | Tee-Object -FilePath $log -Append
+cmd.exe /c "npx tsx scripts/aviso-barrido-gei.ts $modo `"$log`" 2>&1" | ForEach-Object { Write-Host $_; Add-Content -Path $log -Value $_ -Encoding UTF8 }
 
 # 6. Conservar solo los últimos 24 registros.
 Get-ChildItem -Path $carpetaLogs -Filter "barrido-*.log" |
