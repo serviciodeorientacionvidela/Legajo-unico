@@ -72,6 +72,8 @@ export interface ResultadoImportacionGei {
   calificacionesActualizadas: number;
   carpetasDriveCreadas: number;
   carpetasDriveMovidas: number;
+  /** Alumnos regulares que ya no figuran en la matrícula del GEI y se marcaron como salidos (pase). */
+  estudiantesSalidos: number;
   errores: ErrorFilaGei[];
   advertencias: string[];
   duracionMs: number;

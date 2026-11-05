@@ -30,6 +30,7 @@ import {
   type NuevoIncidente,
 } from "@/lib/dataSource";
 import { USUARIOS_DEMO } from "@/lib/demoData";
+import { cicloLectivoActual } from "@/lib/ciclo";
 import { tienePermiso } from "@/lib/rbac";
 import {
   ROL_ETIQUETA,
@@ -453,7 +454,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           />
           <div>
             <h1 className="text-base font-bold leading-tight text-white">Legajo Único</h1>
-            <p className="text-xs text-institucional-200">del Estudiante · Ciclo 2026</p>
+            <p className="text-xs text-institucional-200">del Estudiante · Ciclo {cicloLectivoActual()}</p>
           </div>
         </div>
 
@@ -545,7 +546,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
                 ? "Indicadores institucionales, seguimiento y exportación"
                 : vista === "usuarios"
                   ? "Cuentas de acceso, roles y fotos de perfil"
-                  : "Escuela 4012 · Mendoza · Ciclo lectivo 2026"}
+                  : `Escuela 4012 · Mendoza · Ciclo lectivo ${cicloLectivoActual()}`}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

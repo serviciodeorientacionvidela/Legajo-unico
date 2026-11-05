@@ -38,6 +38,7 @@ import {
   type FichaGei,
   type PadGei,
 } from "../src/services/geiFichas";
+import { ANIO_MAXIMO_ESCUELA, aniosSeguidos, cicloLectivoActual } from "../src/lib/ciclo";
 
 cargarEnv({ path: ".env.local" });
 cargarEnv();
@@ -54,8 +55,16 @@ const SIN_HISTORIAL = argumentos.has("--sin-historial");
 const URL_INGRESO = process.env.GEI_LOGIN_URL ?? "https://intranet.mendoza.edu.ar/usuarios/auth/login";
 const URL_GEI = (process.env.GEI_BASE_URL ?? "https://dti.mendoza.edu.ar/gem/").replace(/\/?$/, "/");
 const ESCUELA_ID = process.env.GEI_ESCUELA_ID ?? "1000";
-const CICLO = Number(process.env.GEI_CICLO ?? new Date().getFullYear());
-const ANIOS = (process.env.GEI_ANIOS ?? "1,2,3,4,5").split(",").map((a) => Number(a.trim())).filter(Boolean);
+/** El ciclo nuevo empieza en marzo: en enero y febrero se sigue barriendo el ciclo anterior. */
+const CICLO = Number(process.env.GEI_CICLO || cicloLectivoActual());
+/**
+ * GEI_ANIOS="auto" (o vacío): sigue a la cohorte del LUE (2026 → 1.º a 3.º, 2027 → 1.º a 4.º…),
+ * hasta GEI_ANIO_MAXIMO (por defecto 6). Una lista ("1,2,3") fija los años a mano.
+ */
+const ANIOS =
+  !process.env.GEI_ANIOS || process.env.GEI_ANIOS.trim().toLowerCase() === "auto"
+    ? aniosSeguidos(CICLO, Number(process.env.GEI_ANIO_MAXIMO || ANIO_MAXIMO_ESCUELA))
+    : process.env.GEI_ANIOS.split(",").map((a) => Number(a.trim())).filter(Boolean);
 /** Ciclos anteriores de los que se importan notas (solo de esta escuela: el GEI no muestra otras). */
 const CICLOS_ANTERIORES = Number(process.env.GEI_CICLOS_ANTERIORES ?? 2);
 
@@ -300,11 +309,14 @@ async function importar(
       nombreArchivo: matricula.nombre,
       cicloLectivo: CICLO,
       anios: ANIOS,
+      marcarAusentes: true,
       sincronizarDrive: !SIN_DRIVE,
       ipAddress: "gei-scraper",
     });
     console.log(`\n📊 Matrícula: ${m.estudiantesCreados} creados · ${m.estudiantesActualizados} actualizados`);
     console.log(`   Drive: ${m.carpetasDriveCreadas} carpetas creadas, ${m.carpetasDriveMovidas} movidas`);
+    if (m.estudiantesSalidos > 0)
+      console.log(`📊 Salidos: ${m.estudiantesSalidos} alumnos ya no figuran en el GEI (marcados como pase; el legajo queda en consulta)`);
     m.advertencias.forEach((a) => console.warn(`   ⚠ ${a}`));
     m.errores.forEach((e) => console.warn(`   ✗ [fila ${e.fila}] ${e.motivo.replace(/\d{7,8}/g, "<dni>")}`));
 

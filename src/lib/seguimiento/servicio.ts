@@ -27,6 +27,7 @@ import {
   filtroCurso,
 } from "./permisos";
 import { z } from "zod";
+import { cicloDeFecha, cicloLectivoActual } from "../ciclo";
 
 export const aperturaSelect = {
   legajoAbiertoEl: true,
@@ -186,7 +187,7 @@ export async function cargarSeguimiento(
   return {
     perfil: p.funcion,
     estudiante: { ...e, vencimientoCud: equipo ? e.vencimientoCud : null },
-    inasistencias: inasistenciasAnuales(e, Number(diaLocal().slice(0, 4))),
+    inasistencias: inasistenciasAnuales(e, cicloLectivoActual()),
     actuaciones: actuaciones.map((a) =>
       a.confidencial && !equipo
         ? {
@@ -281,7 +282,7 @@ export async function escribirSeguimiento(
           409,
           "El legajo está archivado por pase, abandono o egreso; solo admite consulta.",
         );
-      const ciclo = Number(diaLocal().slice(0, 4));
+      const ciclo = cicloLectivoActual();
       const faltas = inasistenciasAnuales(e, ciclo);
       let audit: AccionAuditoria = "CARGAR_ACTUACION";
       const abrir = async (
@@ -414,7 +415,7 @@ export async function escribirSeguimiento(
             estudianteId: e.id,
             autorId: u.id,
             fecha: new Date(d.fecha),
-            cicloLectivo: Number(d.fecha.slice(0, 4)),
+            cicloLectivo: cicloDeFecha(d.fecha),
             tipo: d.tipo,
             motivo: d.motivo,
             resumen: d.resumen,
@@ -505,7 +506,7 @@ export async function escribirSeguimiento(
             estudianteId: e.id,
             autorId: u.id,
             fecha: new Date(d.fecha),
-            cicloLectivo: Number(d.fecha.slice(0, 4)),
+            cicloLectivo: cicloDeFecha(d.fecha),
             tipo: "OTRA",
             motivo: destinatario
               ? `Derivación a ${destinatario.nombre}`
@@ -875,7 +876,7 @@ export async function bandeja(p: Perfil, u: UsuarioSesion) {
       turno: e.turno,
       estadoMatricula: e.estadoMatricula,
       abierto: !!e.legajoAbiertoEl,
-      inasistencias: inasistenciasAnuales(e, Number(diaLocal().slice(0, 4))),
+      inasistencias: inasistenciasAnuales(e, cicloLectivoActual()),
       ice: e.puntosConvivencia,
       pendientes: e.derivaciones.filter((d) => d.estado !== "CERRADA").length,
       seguimientos: e.seguimientos,

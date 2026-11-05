@@ -57,10 +57,12 @@ New-Item -ItemType Directory -Force -Path $carpetaLogs | Out-Null
 $log = Join-Path $carpetaLogs ("barrido-" + (Get-Date -Format "yyyy-MM-dd_HHmm") + ".log")
 Add-Content -Path $log -Encoding UTF8 -Value ("Barrido iniciado " + (Get-Date -Format "yyyy-MM-dd HH:mm") + " por " + $env:USERNAME)
 
-# 4. Barrido. Las notas de ciclos anteriores no cambian: se omiten (más rápido).
+# 4. Barrido. Las notas de ciclos anteriores no cambian: se omiten (más rápido), salvo en marzo,
+#    primer barrido del ciclo nuevo, que trae también las notas finales y mesas del ciclo que cerró.
+$opciones = $(if ((Get-Date).Month -eq 3) { "" } else { "--sin-historial" })
 Write-Host ""
 Write-Host "  Barriendo el GEI. No cierre esta ventana (tarda entre 20 y 60 minutos)..." -ForegroundColor Yellow
-cmd.exe /c "npm run gei:scrape -- --sin-historial 2>&1" | ForEach-Object { Write-Host $_; Add-Content -Path $log -Value $_ -Encoding UTF8 }
+cmd.exe /c "npm run gei:scrape -- $opciones 2>&1" | ForEach-Object { Write-Host $_; Add-Content -Path $log -Value $_ -Encoding UTF8 }
 $exito = ($LASTEXITCODE -eq 0)
 
 # Borrar las credenciales de la memoria del proceso.

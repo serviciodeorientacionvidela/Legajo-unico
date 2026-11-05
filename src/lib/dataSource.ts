@@ -367,6 +367,7 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
         calificacionesActualizadas: 0,
         carpetasDriveCreadas: 0,
         carpetasDriveMovidas: 0,
+        estudiantesSalidos: 0,
         errores: [...analisis.errores],
         advertencias: ["Modo demostración: los cambios se guardan solo en memoria y las carpetas de Drive son simuladas."],
         duracionMs: 0,

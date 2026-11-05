@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import { registrarAuditoria } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { cicloLectivoActual } from "@/lib/ciclo";
 import {
   analizarLibroGei,
   calcularPromedio,
@@ -45,7 +46,15 @@ export interface OpcionesImportacionGei {
   ipAddress?: string | null;
   /** Si se indica, solo se importa la matrícula de estos años (p. ej. [1, 2, 3]). */
   anios?: number[];
+  /**
+   * Matrícula completa de la escuela (barrido del GEI): los alumnos regulares que ya no figuran
+   * se marcan como salidos (pase). No usar con archivos parciales cargados a mano.
+   */
+  marcarAusentes?: boolean;
 }
+
+/** Si faltan más que esto de golpe, se asume un archivo incompleto y no se marca a nadie. */
+const MAXIMO_SALIDOS_PROPORCION = 0.2;
 
 const TAMANO_LOTE = 100;
 const CONCURRENCIA_DRIVE = 4;
@@ -180,7 +189,7 @@ export async function importarFichasGei(
   opciones: { usuarioId: string; cicloLectivo?: number; ipAddress?: string | null; progreso?: Progreso },
 ): Promise<ResultadoFichasGei> {
   const inicio = Date.now();
-  const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
+  const ciclo = opciones.cicloLectivo ?? cicloLectivoActual();
   const resultado: ResultadoFichasGei = {
     alumnosActualizados: 0,
     ciclosTrayectoria: 0,
@@ -296,7 +305,7 @@ export async function importarPlanillasGei(
 ): Promise<ResultadoPlanillasGei> {
   const progreso = opciones.progreso;
   const inicio = Date.now();
-  const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
+  const ciclo = opciones.cicloLectivo ?? cicloLectivoActual();
   const resultado: ResultadoPlanillasGei = {
     asistenciasActualizadas: 0,
     calificacionesActualizadas: 0,
@@ -402,7 +411,7 @@ export async function importarArchivoGei(
   opciones: OpcionesImportacionGei,
 ): Promise<ResultadoImportacionGei> {
   const inicio = Date.now();
-  const ciclo = opciones.cicloLectivo ?? new Date().getFullYear();
+  const ciclo = opciones.cicloLectivo ?? cicloLectivoActual();
   const analisis = analizarLibroGei(datos, ciclo);
   const advertencias: string[] = [];
   const errores = [...analisis.errores];
@@ -416,6 +425,7 @@ export async function importarArchivoGei(
     calificacionesActualizadas: 0,
     carpetasDriveCreadas: 0,
     carpetasDriveMovidas: 0,
+    estudiantesSalidos: 0,
     errores,
     advertencias,
     duracionMs: 0,
@@ -476,6 +486,31 @@ export async function importarArchivoGei(
       if (previo.driveFolderId && (previo.anio !== m.anio || previo.division !== m.division)) {
         promociones.add(m.dni);
       }
+    }
+  }
+
+  // --- 1b. Alumnos que ya no figuran (pase a otra escuela, abandono) --------
+  if (opciones.marcarAusentes) {
+    // Presentes: toda la matrícula del archivo, de cualquier año, incluso filas con error de curso.
+    const presentes = new Set(analisis.matricula.map((m) => m.dni));
+    for (const e of errores) for (const dni of e.motivo.match(/\b\d{7,8}\b/g) ?? []) presentes.add(dni);
+    const regulares = await prisma.estudiante.findMany({
+      where: { estadoMatricula: "REGULAR" },
+      select: { id: true, dni: true },
+    });
+    const ausentes = regulares.filter((e) => !presentes.has(e.dni));
+    if (presentes.size < 50) {
+      advertencias.push("La matrícula del GEI vino casi vacía: no se marcó a ningún alumno como salido.");
+    } else if (ausentes.length > Math.max(20, regulares.length * MAXIMO_SALIDOS_PROPORCION)) {
+      advertencias.push(
+        `${ausentes.length} alumnos regulares no figuran en la matrícula del GEI (demasiados de golpe): no se marcó a nadie como salido. Revise si la matrícula del ciclo ya está completa.`,
+      );
+    } else if (ausentes.length > 0) {
+      await prisma.estudiante.updateMany({
+        where: { id: { in: ausentes.map((a) => a.id) } },
+        data: { estadoMatricula: "PASE" },
+      });
+      resultado.estudiantesSalidos = ausentes.length;
     }
   }
 

@@ -8,6 +8,7 @@ import {
   requerirSesion,
 } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { cicloLectivoActual } from "@/lib/ciclo";
 import {
   obtenerPerfil,
   exigirCurso,
@@ -81,7 +82,7 @@ export async function GET(req: Request) {
         .int()
         .min(2000)
         .max(2100)
-        .parse(q.get("ciclo") ?? diaLocal().slice(0, 4));
+        .parse(q.get("ciclo") ?? cicloLectivoActual());
       return jsonConSesion(
         await generarReporte(
           n,

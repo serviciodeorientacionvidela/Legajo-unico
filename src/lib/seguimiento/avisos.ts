@@ -8,11 +8,12 @@ import {
 import { exigirCurso } from "./permisos";
 import { aperturaSelect } from "./servicio";
 import type { TipoNotificacion } from "../types";
+import { cicloLectivoActual } from "../ciclo";
 
 /** Cada ejecución es reintentable: una clave por destinatario, hecho y día evita duplicados. */
 export async function procesarAvisos() {
   const hoy = diaLocal();
-  const ciclo = Number(hoy.slice(0, 4));
+  const ciclo = cicloLectivoActual();
   const usuarios = await prisma.usuario.findMany({
     where: {
       activo: true,

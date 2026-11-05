@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { solicitar } from "@/lib/dataSource";
+import { cicloLectivoActual } from "@/lib/ciclo";
 import { REPORTES, diaLocal, diasHastaFecha } from "@/lib/seguimiento/reglas";
 import type { DatosBandeja, ReporteDatos } from "@/lib/seguimiento/tipos";
 import type { Rol } from "@/lib/types";
@@ -39,7 +40,7 @@ export default function SeguimientoPanel({
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState("todos");
   const [numero, setNumero] = useState(4);
-  const [ciclo, setCiclo] = useState(Number(diaLocal().slice(0, 4)));
+  const [ciclo, setCiclo] = useState(cicloLectivoActual());
   const [curso, setCurso] = useState("");
   const [estado, setEstado] = useState("");
   const [reporte, setReporte] = useState<ReporteDatos | null>(null);

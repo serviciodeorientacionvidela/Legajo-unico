@@ -151,3 +151,20 @@ test('Reporte 9 no admite SOE ni preceptoría aun invocando el servidor directam
  await assert.rejects(()=>generarReporte(9,2026,'','',{usuarioId:'u',funcion:'SOE',cursos:[]},u),/dirección/);
  await assert.rejects(()=>generarReporte(5,2026,'','',{usuarioId:'u',funcion:'PRECEPTORIA',cursos:[]},u),/solo accede/);
 });
+
+test("Ciclo lectivo: arranca en marzo y los años siguen a la cohorte", async () => {
+  const { cicloLectivoActual, cicloDeFecha, aniosSeguidos } = await import("../src/lib/ciclo.ts");
+  assert.equal(cicloLectivoActual(new Date("2026-12-05T11:00:00Z")), 2026);
+  assert.equal(cicloLectivoActual(new Date("2027-01-05T11:00:00Z")), 2026);
+  assert.equal(cicloLectivoActual(new Date("2027-02-28T11:00:00Z")), 2026);
+  assert.equal(cicloLectivoActual(new Date("2027-03-05T11:00:00Z")), 2027);
+  // 1 de marzo a las 00:30 en Mendoza (03:30 UTC) ya es el ciclo nuevo.
+  assert.equal(cicloLectivoActual(new Date("2027-03-01T03:30:00Z")), 2027);
+  assert.equal(cicloDeFecha("2027-02-20"), 2026);
+  assert.equal(cicloDeFecha("2027-03-10"), 2027);
+  assert.deepEqual(aniosSeguidos(2026), [1, 2, 3]);
+  assert.deepEqual(aniosSeguidos(2027), [1, 2, 3, 4]);
+  assert.deepEqual(aniosSeguidos(2028), [1, 2, 3, 4, 5]);
+  assert.deepEqual(aniosSeguidos(2030), [1, 2, 3, 4, 5]);
+  assert.deepEqual(aniosSeguidos(2029, 6), [1, 2, 3, 4, 5, 6]);
+});
