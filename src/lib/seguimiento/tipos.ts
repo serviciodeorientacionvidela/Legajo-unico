@@ -49,6 +49,15 @@ export interface DatosSeguimiento {
     actaLibro?: string | null;
     actaFolio?: string | null;
     actaNumero?: string | null;
+    /** Actas en papel escaneadas (foto o PDF). */
+    adjuntos?: {
+      id: string;
+      nombreArchivo: string;
+      tipoMime: string;
+      tamanio: number;
+      createdAt: string;
+      subidoPor: { nombre: string };
+    }[];
   }[];
   derivaciones: {
     id: string;

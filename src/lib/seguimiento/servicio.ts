@@ -84,7 +84,21 @@ export async function cargarSeguimiento(
     prisma.actuacion.findMany({
       where: { estudianteId: e.id },
       orderBy: [{ cicloLectivo: "desc" }, { fecha: "desc" }],
-      include: { autor: { select: { nombre: true, rol: true, cargo: true } } },
+      include: {
+        autor: { select: { nombre: true, rol: true, cargo: true } },
+        // Actas escaneadas: solo los datos del archivo, nunca el contenido.
+        adjuntos: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            nombreArchivo: true,
+            tipoMime: true,
+            tamanio: true,
+            createdAt: true,
+            subidoPor: { select: { nombre: true } },
+          },
+        },
+      },
     }),
     prisma.derivacion.findMany({
       where: {
@@ -285,6 +299,8 @@ export async function escribirSeguimiento(
       const ciclo = cicloLectivoActual();
       const faltas = inasistenciasAnuales(e, ciclo);
       let audit: AccionAuditoria = "CARGAR_ACTUACION";
+      /** Id de la actuación creada (para adjuntarle el acta escaneada). */
+      let actuacionCreadaId: string | undefined;
       const abrir = async (
         motivo: Parameters<typeof validarApertura>[0],
         detalle: string,
@@ -429,6 +445,7 @@ export async function escribirSeguimiento(
             incidenteId: incidente?.id,
           },
         });
+        actuacionCreadaId = a.id;
         if (d.condicional)
           await tx.situacionEspecial.create({
             data: {
@@ -809,7 +826,7 @@ export async function escribirSeguimiento(
           ipAddress: ip,
         },
       });
-      return { guardado: true };
+      return { guardado: true, ...(actuacionCreadaId ? { id: actuacionCreadaId } : {}) };
     },
     {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

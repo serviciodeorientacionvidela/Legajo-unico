@@ -435,8 +435,9 @@ function ClaveModal({
         )}
         {estado && !estado.temporal && (
           <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
-            Esta persona ya eligió su propia contraseña. Por seguridad no se guarda legible y no se puede ver. Si la olvidó,
-            genere una temporal nueva.
+            {estado.pendienteDeCambio
+              ? "Todavía no eligió su contraseña: sigue con la inicial de la planilla de accesos. Si la perdió, genere una temporal nueva."
+              : "Esta persona ya eligió su propia contraseña. Por seguridad no se guarda legible y no se puede ver. Si la olvidó, genere una temporal nueva."}
           </p>
         )}
         {error && <MensajeError mensaje={error} />}

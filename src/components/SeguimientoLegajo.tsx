@@ -38,6 +38,7 @@ import {
 } from "@/lib/types";
 import { MensajeError } from "./ui";
 import { GuiaProtocoloPanel } from "./Protocolos";
+import AdjuntosActuacion, { subirAdjunto } from "./AdjuntosActuacion";
 import { DocumentoInforme, ZonaImpresion, useImpresion } from "./Imprimible";
 
 export function Campo({
@@ -358,15 +359,26 @@ export default function SeguimientoLegajo({
         seguimientoFecha: texto(f, "seguimientoFecha"),
         responsableId: texto(f, "responsableId"),
       };
+    const adjunto = formulario === "ACTUACION" ? f.get("adjunto") : null;
     setGuardando(true);
     setError(null);
     try {
-      await request("", {
+      const r = await request<{ id?: string }>("", {
         method: "POST",
         body: JSON.stringify({ dni, accion: formulario, datos: payload }),
       });
       setFormulario("");
       setMensaje("Registro guardado y auditado.");
+      if (adjunto instanceof File && adjunto.size > 0 && r?.id) {
+        try {
+          await subirAdjunto(r.id, adjunto);
+          setMensaje("Registro guardado y auditado, con el acta escaneada.");
+        } catch (e) {
+          setError(
+            `La actuación se guardó, pero no se pudo subir el acta: ${(e as Error).message} Puede adjuntarla desde la línea de tiempo.`,
+          );
+        }
+      }
       await cargar();
     } catch (e) {
       setError((e as Error).message);
@@ -702,6 +714,16 @@ export default function SeguimientoLegajo({
                       </select>
                     </Campo>
                   </div>
+                  {!modoDemo && (
+                    <Campo label="Acta escaneada (foto o PDF, opcional)">
+                      <input
+                        type="file"
+                        name="adjunto"
+                        accept="image/*,application/pdf"
+                        className={inputLue}
+                      />
+                    </Campo>
+                  )}
                   {equipo && (
                     <label className="flex gap-2 text-sm">
                       <input type="checkbox" name="confidencial" />
@@ -1189,6 +1211,17 @@ export default function SeguimientoLegajo({
                                   : ""}
                               </p>
                             )}
+                            <AdjuntosActuacion
+                              actuacionId={a.id}
+                              adjuntos={("adjuntos" in a && a.adjuntos) || []}
+                              puedeAdjuntar={
+                                !modoDemo &&
+                                editable &&
+                                !a.anuladaEl &&
+                                !(a.confidencial && !equipo)
+                              }
+                              onSubido={() => void cargar()}
+                            />
                             {editable && !a.anuladaEl && (
                               <button
                                 className="mr-3 mt-2 text-xs font-semibold text-institucional-700 underline print:hidden"

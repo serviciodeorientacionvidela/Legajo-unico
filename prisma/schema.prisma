@@ -187,6 +187,7 @@ model Usuario {
   participaciones        ParticipanteConversacion[]
   mensajes               Mensaje[]
   documentosSubidos      DocumentoNormativa[]
+  adjuntosSubidos        AdjuntoActuacion[]
   seguimientosACargo     SeguimientoCaso[]
   situacionesRegistradas SituacionEspecial[]
   fichasCargadas         FichaAnexa[]
@@ -473,6 +474,9 @@ model Actuacion {
   /// Intervenciones del SOE vinculadas a esta actuación.
   intervencionesSoe IntervencionSoe[]
 
+  /// Actas en papel escaneadas (foto o PDF). No se borran: dejan constancia del original.
+  adjuntos AdjuntoActuacion[]
+
   createdAt DateTime @default(now())
 
   @@index([estudianteId, fecha])
@@ -708,4 +712,20 @@ model DocumentoNormativa {
   createdAt     DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// Foto o PDF de un acta en papel, adjunta a una actuación del legajo.
+model AdjuntoActuacion {
+  id            String    @id @default(cuid())
+  actuacionId   String
+  actuacion     Actuacion @relation(fields: [actuacionId], references: [id], onDelete: Cascade)
+  nombreArchivo String
+  tipoMime      String
+  tamanio       Int
+  contenido     Bytes
+  subidoPorId   String
+  subidoPor     Usuario   @relation(fields: [subidoPorId], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@index([actuacionId])
 }
