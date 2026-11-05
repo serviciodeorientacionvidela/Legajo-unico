@@ -163,38 +163,8 @@ export async function procesarAvisos() {
         return false;
       }
     });
-    const faltas = inasistenciasAnuales(e, ciclo);
-    for (const umbral of [10, 15, 20]) {
-      if (faltas === null || faltas < umbral) continue;
-      const destinatarios =
-        umbral === 20
-          ? equipo
-          : umbral === 15
-            ? [
-                ...preceptores,
-                ...equipo.filter((u) => u.perfilSeguimiento?.funcion === "SOE"),
-              ]
-            : preceptores;
-      for (const u of destinatarios)
-        await avisar(
-          u.id,
-          "ALERTA_INASISTENCIAS",
-          `faltas:${e.id}:${ciclo}:${umbral}:${u.id}`,
-          e.id,
-          e.dni,
-          `${umbral} inasistencias: ${umbral === 10 ? "citación familiar" : umbral === 15 ? "intervención del SOE (propuesta institucional)" : "revisar apertura y condicionalidad"}`,
-        );
-    }
-    if (e.puntosConvivencia === 0)
-      for (const u of directivos)
-        await avisar(
-          u.id,
-          "LEGAJO_ABIERTO",
-          `ice:${e.id}:${ciclo}:${u.id}`,
-          e.id,
-          e.dni,
-          "ICE en cero: revisar apertura y Consejo de Convivencia",
-        );
+    // Inasistencias e ICE no generan avisos por alumno: el barrido del GEI deja un único aviso con el
+    // resumen del mes y el detalle está en la bandeja de Seguimiento LUE.
     for (const s of e.situaciones) {
       if (!s.fechaVencimiento || diasHastaFecha(s.fechaVencimiento, hoy) > 7)
         continue;
