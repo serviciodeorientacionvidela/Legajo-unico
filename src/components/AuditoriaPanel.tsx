@@ -28,6 +28,7 @@ const ACCIONES: Record<AccionAuditoria, { etiqueta: string; tono: "azul" | "viol
   VER_FICHA_ANEXA: { etiqueta: "Vio ficha anexa", tono: "rojo" },
   EDITAR_FICHA_ANEXA: { etiqueta: "Editó ficha anexa", tono: "rojo" },
   VER_REPORTE_RESTRINGIDO: { etiqueta: "Vio reporte restringido", tono: "rojo" },
+  GESTIONAR_NORMATIVA: { etiqueta: "Gestionó normativa", tono: "neutro" },
 };
 
 export default function AuditoriaPanel({ abierto, onCerrar, cargar }: Props) {

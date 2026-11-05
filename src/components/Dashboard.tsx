@@ -595,7 +595,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         ) : vista === "mensajes" && !modoDemo ? (
           <MensajesPanel onCambioNoLeidos={actualizarNoLeidos} />
         ) : vista === "normativa" ? (
-          <NormativaPanel />
+          <NormativaPanel puedeGestionar={tienePermiso(rol, "GESTIONAR_NORMATIVA")} modoDemo={modoDemo} />
         ) : vista === "seguimiento" && rol !== "DOCENTE" ? (
           <SeguimientoPanel modoDemo={modoDemo} rol={rol} administrador={esAdministrador} />
         ) : vista === "usuarios" && esAdministrador ? (

@@ -46,6 +46,7 @@ enum AccionAuditoria {
   VER_FICHA_ANEXA
   EDITAR_FICHA_ANEXA
   VER_REPORTE_RESTRINGIDO
+  GESTIONAR_NORMATIVA
 }
 
 // --- Seguimiento de trayectorias (maquetas: legajo, nueva actuación, derivación, apertura y reportes) ---
@@ -179,6 +180,7 @@ model Usuario {
   conversacionesCreadas  Conversacion[]
   participaciones        ParticipanteConversacion[]
   mensajes               Mensaje[]
+  documentosSubidos      DocumentoNormativa[]
   seguimientosACargo     SeguimientoCaso[]
   situacionesRegistradas SituacionEspecial[]
   fichasCargadas         FichaAnexa[]
@@ -682,4 +684,20 @@ model Mensaje {
   createdAt      DateTime     @default(now())
 
   @@index([conversacionId, createdAt])
+}
+
+/// Documentos de la sección Normativa subidos por dirección / SOE (además de los fijos de public/normativa).
+model DocumentoNormativa {
+  id            String   @id @default(cuid())
+  titulo        String
+  descripcion   String?
+  nombreArchivo String
+  tipoMime      String
+  tamanio       Int
+  contenido     Bytes
+  subidoPorId   String
+  subidoPor     Usuario  @relation(fields: [subidoPorId], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
 }

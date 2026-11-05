@@ -50,6 +50,7 @@ export const PERMISOS = {
   GENERAR_INFORMES: ["DIRECTIVO_SOE", "PRECEPTOR"],
   VER_AUDITORIA: ["DIRECTIVO_SOE"],
   IMPORTAR_GEI: ["DIRECTIVO_SOE"],
+  GESTIONAR_NORMATIVA: ["DIRECTIVO_SOE"],
 } as const satisfies Record<string, readonly Rol[]>;
 
 export type Permiso = keyof typeof PERMISOS;

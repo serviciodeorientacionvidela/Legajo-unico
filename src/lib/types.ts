@@ -101,6 +101,7 @@ export const ACCIONES_AUDITORIA = [
   "VER_FICHA_ANEXA",
   "EDITAR_FICHA_ANEXA",
   "VER_REPORTE_RESTRINGIDO",
+  "GESTIONAR_NORMATIVA",
 ] as const;
 export type AccionAuditoria = (typeof ACCIONES_AUDITORIA)[number];
 
