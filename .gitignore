@@ -25,3 +25,6 @@ test-results/
 .DS_Store
 *.log
 .vercel
+
+# registros del barrido GEI (pueden tener datos de alumnos)
+logs/

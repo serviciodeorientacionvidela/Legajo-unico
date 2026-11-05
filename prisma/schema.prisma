@@ -149,6 +149,7 @@ enum TipoNotificacion {
   SITUACION_POR_VENCER
   TICKET_ACTUALIZADO
   MENSAJE_NUEVO
+  GEI_SINCRONIZADO
 }
 
 model Usuario {

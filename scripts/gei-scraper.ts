@@ -22,7 +22,7 @@
  *   npm run gei:scrape -- --sin-historial  # omite las notas de ciclos anteriores
  *
  * Variables de entorno (ver .env.example): GEI_USER, GEI_PASS, GEI_SYNC_USER_EMAIL y, opcionalmente,
- * GEI_LOGIN_URL, GEI_BASE_URL, GEI_ESCUELA_ID, GEI_ANIOS, GEI_CICLO.
+ * GEI_LOGIN_URL, GEI_BASE_URL, GEI_ESCUELA_ID, GEI_ROL, GEI_ANIOS, GEI_CICLO.
  *
  * Requiere una única vez: npx playwright install chromium
  */
@@ -104,6 +104,37 @@ async function iniciarSesion(page: Page): Promise<void> {
   console.log("✓ Sesión iniciada en la intranet DGE");
 }
 
+/**
+ * Las cuentas con varios roles (otra escuela, PAD de familias) pueden entrar al GEI con un rol que no ve
+ * las planillas ("Acción no autorizada"). Se elige el rol de esta escuela en el selector "Cambiar Rol".
+ * GEI_ROL: texto del rol a usar (por defecto "Adm. Alumnos Escuela 4012").
+ */
+async function seleccionarRol(page: Page): Promise<void> {
+  const buscado = (process.env.GEI_ROL ?? "Adm. Alumnos Escuela 4012").trim().toLowerCase();
+  await page.goto(`${URL_GEI}usuarios/rol/modal_seleccionar?redirect_url=${encodeURIComponent(`escuela/escritorio/${ESCUELA_ID}`)}`, {
+    waitUntil: "domcontentloaded",
+    timeout: TIMEOUT_MS,
+  });
+  const selector = page.locator('select[name="rol"]').first();
+  if (!(await selector.isVisible().catch(() => false))) return; // cuenta con un solo rol
+  const opciones = await selector.locator("option").evaluateAll((os) =>
+    os.map((o) => ({ valor: (o as HTMLOptionElement).value, texto: (o.textContent ?? "").trim() })),
+  );
+  const elegida = opciones.find((o) => o.texto.toLowerCase().includes(buscado));
+  if (!elegida) {
+    throw new Error(
+      `La cuenta no tiene el rol "${buscado}". Roles disponibles: ${opciones.map((o) => o.texto).join(" · ")}. Defina GEI_ROL.`,
+    );
+  }
+  await selector.selectOption(elegida.valor);
+  await Promise.all([
+    page.waitForLoadState("domcontentloaded"),
+    page.locator('button:has-text("Seleccionar"), input[type="submit"]').first().click(),
+  ]);
+  await page.waitForLoadState("networkidle").catch(() => {});
+  console.log(`✓ Rol seleccionado: ${elegida.texto}`);
+}
+
 /** Entra al GEI desde el escritorio de la intranet (el ícono abre el GEI, a veces en otra pestaña). */
 async function entrarAlGei(contexto: BrowserContext, page: Page): Promise<Page> {
   const destino = `${URL_GEI}escuela/escritorio/${ESCUELA_ID}`;
@@ -115,6 +146,7 @@ async function entrarAlGei(contexto: BrowserContext, page: Page): Promise<Page> 
       const gei = contexto.pages().find((p) => p.url().includes("/gem/"));
       if (gei) {
         await gei.waitForLoadState("domcontentloaded");
+        await seleccionarRol(gei);
         await gei.goto(destino, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
         console.log("✓ Dentro del GEI");
         return gei;
@@ -123,6 +155,8 @@ async function entrarAlGei(contexto: BrowserContext, page: Page): Promise<Page> 
     }
   }
   // Sin ícono visible: se intenta directo con la sesión ya iniciada.
+  await page.goto(URL_GEI, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
+  await seleccionarRol(page);
   await page.goto(destino, { waitUntil: "domcontentloaded", timeout: TIMEOUT_MS });
   if (!page.url().includes("/gem/") || (await page.locator('input[type="password"]').first().isVisible().catch(() => false))) {
     throw new Error("No se pudo entrar al GEI después del login (ejecute con --headed para ver qué pasa).");
