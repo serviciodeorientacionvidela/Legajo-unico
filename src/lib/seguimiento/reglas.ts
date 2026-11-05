@@ -1,7 +1,13 @@
 import { z } from "zod";
 import {
+  CAUSAS_ACTUACION,
+  FOLIO_MAX,
+  LIBROS_ACTA,
+  NUMERO_ACTA_MAX,
   TIPOS_ACTUACION,
   MOTIVOS_APERTURA,
+  type MotivoApertura,
+  type TipoActuacion,
   TIPOS_SITUACION,
   DESTINOS_DERIVACION,
   ESTADOS_SITUACION,
@@ -40,9 +46,11 @@ export const actuacionSchema = z
         (v) => v.split(/\r?\n/).length <= 3,
         "El resumen admite hasta tres líneas",
       ),
+    causa: texto.max(100).default(""),
     tipoActa: texto.max(100).default(""),
     actaLibro: texto.max(30).default(""),
     actaFolio: texto.max(30).default(""),
+    actaNumero: texto.max(10).default(""),
     confidencial: z.boolean().default(false),
     motivoApertura: z.enum(MOTIVOS_APERTURA).optional(),
     seguimientoFecha: fecha.optional(),
@@ -53,8 +61,24 @@ export const actuacionSchema = z
     resolucion: texto.default(""),
   })
   .refine(
+    (d) => CAUSAS_ACTUACION[d.tipo].includes(d.causa),
+    "Seleccione una causa válida para el tipo de actuación",
+  )
+  .refine(
     (d) => !d.tipoActa || !!(d.actaLibro && d.actaFolio),
     "Complete libro y folio del acta",
+  )
+  .refine(
+    (d) => !d.actaLibro || (LIBROS_ACTA as readonly string[]).includes(d.actaLibro),
+    "Libro de actas inválido",
+  )
+  .refine(
+    (d) => !d.actaFolio || enRango(d.actaFolio, FOLIO_MAX),
+    `El folio debe estar entre 1 y ${FOLIO_MAX}`,
+  )
+  .refine(
+    (d) => !d.actaNumero || enRango(d.actaNumero, NUMERO_ACTA_MAX),
+    `El número de acta debe estar entre 1 y ${NUMERO_ACTA_MAX}`,
   )
   .refine(
     (d) => !d.puntosIce || !!(d.descargo && d.resolucion && d.tipoActa),
@@ -67,6 +91,8 @@ export const actuacionSchema = z
 export const derivacionSchema = z.object({
   fecha,
   motivo: texto.min(5),
+  destinatarioId: z.string().max(40).optional(),
+  actuacionId: z.string().max(40).optional(),
   seguimientoFecha: fecha.optional(),
   responsableId: z.string().optional(),
 });
@@ -167,6 +193,27 @@ export function inasistenciasAnuales(
   // Los resúmenes mensuales pueden estar incompletos: no se presentan como acumulado anual.
   return null;
 }
+function enRango(valor: string, max: number) {
+  const n = Number(valor);
+  return Number.isInteger(n) && n >= 1 && n <= max;
+}
+
+/** Motivo de apertura del legajo que corresponde al tipo y la causa de la actuación. */
+export function motivoAperturaDesde(tipo: TipoActuacion, causa: string): MotivoApertura {
+  if (tipo === "INASISTENCIAS") {
+    if (causa === "Condicionalidad") return "CONDICIONALIDAD";
+    if (causa === "+20 inasistencias") return "INASISTENCIAS";
+    return "OTRO";
+  }
+  if (tipo === "CONVIVENCIA_ICE")
+    return causa === "Falta grave" || causa === "Falta extremadamente grave" ? "FALTA_GRAVE" : "OTRO";
+  if (tipo === "PROTOCOLO") return "PROTOCOLO";
+  if (tipo === "ESCOLARIDAD_PROTEGIDA") return "ESCOLARIDAD_PROTEGIDA";
+  if (tipo === "DEPORTISTA_FEDERADO") return "DEPORTISTA_FEDERADO";
+  if (tipo === "INCLUSION_PPI" && causa === "PPI") return "PPI";
+  return "OTRO";
+}
+
 export function validarApertura(
   motivo: string | undefined,
   faltas: number | null,

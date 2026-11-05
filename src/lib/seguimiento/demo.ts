@@ -13,6 +13,7 @@ import {
   estadoVigencia,
   REPORTES,
   validarApertura,
+  motivoAperturaDesde,
 } from "./reglas";
 const seed = crearSeguimientoDemo();
 const estudiantes = crearLegajosDemo();
@@ -105,8 +106,10 @@ export async function solicitarSeguimientoDemo<T>(
       if (a.confidencial && perfil === "PRECEPTORIA")
         throw new Error("Sin acceso a contenido reservado.");
       if (!apertura(dni)) {
+        const motivoApertura =
+          a.motivoApertura ?? motivoAperturaDesde(a.tipo, a.causa);
         const error = validarApertura(
-          a.motivoApertura,
+          motivoApertura,
           e.trayectoria.find((t) => t.activo)?.inasistencias ?? null,
           e.puntosConvivencia,
           e.requierePpi,
@@ -119,8 +122,8 @@ export async function solicitarSeguimientoDemo<T>(
         seed.aperturas.push({
           dni,
           fecha: diaLocal(),
-          motivo: a.motivoApertura!,
-          detalle: a.motivo,
+          motivo: motivoApertura,
+          detalle: `${a.causa} · ${a.motivo}`,
           promedio: e.promedioGeneral,
           pendientes: e.calificaciones.filter((c) => c.previa).length,
           inasistencias:

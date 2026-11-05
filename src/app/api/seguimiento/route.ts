@@ -42,6 +42,37 @@ export async function GET(req: Request) {
         u,
       );
     }
+    if (q.has("avisos")) {
+      // Avisos sin leer del usuario (derivaciones nuevas, seguimientos), para mostrarlos al ingresar.
+      if (!seguimientoHabilitado() || u.rol === "DOCENTE")
+        return jsonConSesion({ avisos: [] }, u);
+      const avisos = await prisma.notificacion.findMany({
+        where: { usuarioId: u.id, leida: false },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          tipo: true,
+          titulo: true,
+          mensaje: true,
+          createdAt: true,
+          estudiante: { select: { dni: true } },
+        },
+      });
+      return jsonConSesion(
+        {
+          avisos: avisos.map((a) => ({
+            id: a.id,
+            tipo: a.tipo,
+            titulo: a.titulo,
+            mensaje: a.mensaje,
+            createdAt: a.createdAt.toISOString(),
+            dni: a.estudiante?.dni ?? null,
+          })),
+        },
+        u,
+      );
+    }
     const p = await obtenerPerfil(u);
     if (q.has("reporte")) {
       const n = z.coerce.number().int().min(1).max(12).parse(q.get("reporte"));

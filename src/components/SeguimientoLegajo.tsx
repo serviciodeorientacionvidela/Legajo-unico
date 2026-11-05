@@ -18,11 +18,18 @@ import {
 } from "@/lib/seguimiento/reglas";
 import {
   type Rol,
+  etiquetaCargo,
+  type TipoActuacion,
   TIPOS_ACTUACION,
   TIPO_ACTUACION_ETIQUETA,
-  MOTIVOS_APERTURA,
+  CAUSAS_ACTUACION,
+  LIBROS_ACTA,
+  FOLIO_MAX,
+  NUMERO_ACTA_MAX,
   MOTIVO_APERTURA_ETIQUETA,
   TIPOS_ACTA,
+  TIPO_INTERVENCION_ETIQUETA,
+  type TipoIntervencion,
   TIPOS_SITUACION,
   TIPO_SITUACION_ETIQUETA,
   ESTADOS_SITUACION,
@@ -30,6 +37,7 @@ import {
   DESTINO_DERIVACION_ETIQUETA,
 } from "@/lib/types";
 import { MensajeError } from "./ui";
+import { GuiaProtocoloPanel } from "./Protocolos";
 import { DocumentoInforme, ZonaImpresion, useImpresion } from "./Imprimible";
 
 export function Campo({
@@ -113,6 +121,61 @@ function FotoTrayectoria({ datos }: { datos: unknown }) {
     </div>
   );
 }
+/** Quiénes intervinieron en el caso y en qué, para coordinar cuando hay varios agentes. */
+function AgentesIntervinientes({ datos }: { datos: DatosSeguimiento }) {
+  const agentes = new Map<
+    string,
+    { conteo: Record<string, number>; ultima: string }
+  >();
+  const sumar = (nombre: string | undefined, tipo: string, cuando: string) => {
+    if (!nombre) return;
+    const a = agentes.get(nombre) ?? { conteo: {}, ultima: cuando };
+    a.conteo[tipo] = (a.conteo[tipo] ?? 0) + 1;
+    if (cuando > a.ultima) a.ultima = cuando;
+    agentes.set(nombre, a);
+  };
+  for (const a of datos.actuaciones)
+    if (!a.anuladaEl) sumar(a.autor.nombre, "actuación", a.fecha);
+  for (const i of datos.intervencionesSoe ?? [])
+    sumar(i.profesional.nombre, "intervención SOE", i.fecha);
+  for (const d of datos.derivaciones)
+    sumar(d.derivadoPor.nombre, "derivación", d.fecha);
+  for (const s of datos.seguimientos)
+    sumar(s.responsable?.nombre, "seguimiento a cargo", s.fechaProgramada);
+  const lista = [...agentes.entries()].sort((a, b) =>
+    b[1].ultima.localeCompare(a[1].ultima),
+  );
+  const plural = (t: string, n: number) =>
+    n === 1
+      ? t
+      : t
+          .replace("actuación", "actuaciones")
+          .replace("intervención", "intervenciones")
+          .replace("derivación", "derivaciones")
+          .replace("seguimiento", "seguimientos");
+  return (
+    <section className="rounded-xl bg-white p-4">
+      <h4 className="mb-3 font-bold">Agentes intervinientes</h4>
+      {!lista.length && (
+        <p className="text-sm text-slate-500">Todavía nadie intervino.</p>
+      )}
+      <ul className="space-y-2">
+        {lista.map(([nombre, a]) => (
+          <li key={nombre} className="text-sm">
+            <p className="font-semibold">{nombre}</p>
+            <p className="text-xs text-slate-500">
+              {Object.entries(a.conteo)
+                .map(([t, n]) => `${n} ${plural(t, n)}`)
+                .join(" · ")}{" "}
+              · Última: {fecha(a.ultima)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function SeguimientoLegajo({
   dni,
   modoDemo = false,
@@ -134,6 +197,9 @@ export default function SeguimientoLegajo({
     (typeof TIPOS_SITUACION)[number]
   >("ESCOLARIDAD_PROTEGIDA");
   const [ficha, setFicha] = useState<Record<string, string>>({});
+  const [tipoActuacion, setTipoActuacion] =
+    useState<TipoActuacion>("INASISTENCIAS");
+  const [causa, setCausa] = useState("");
   async function request<T>(query: string, init?: RequestInit): Promise<T> {
     if (modoDemo) {
       const { solicitarSeguimientoDemo } =
@@ -176,6 +242,8 @@ export default function SeguimientoLegajo({
   function abrir(tipo: string, identificador = "") {
     setFormulario(tipo);
     setId(identificador);
+    setTipoActuacion("INASISTENCIAS");
+    setCausa("");
     setError(null);
     setMensaje("");
   }
@@ -202,17 +270,12 @@ export default function SeguimientoLegajo({
         fecha: texto(f, "fecha"),
         motivo: texto(f, "motivo"),
         resumen: texto(f, "resumen"),
+        causa: texto(f, "causa"),
         tipoActa: texto(f, "tipoActa"),
         actaLibro: texto(f, "actaLibro"),
         actaFolio: texto(f, "actaFolio"),
+        actaNumero: texto(f, "actaNumero"),
         confidencial: f.has("confidencial"),
-        condicional: f.has("condicional"),
-        puntosIce: Number(texto(f, "puntosIce")),
-        descargo: texto(f, "descargo"),
-        resolucion: texto(f, "resolucion"),
-        ...(texto(f, "motivoApertura")
-          ? { motivoApertura: texto(f, "motivoApertura") }
-          : {}),
         ...(texto(f, "seguimientoFecha")
           ? {
               seguimientoFecha: texto(f, "seguimientoFecha"),
@@ -221,7 +284,14 @@ export default function SeguimientoLegajo({
           : {}),
       };
     if (formulario === "DERIVACION")
-      payload = { fecha: texto(f, "fecha"), motivo: texto(f, "motivo") };
+      payload = {
+        fecha: texto(f, "fecha"),
+        motivo: texto(f, "motivo"),
+        ...(texto(f, "destinatarioId")
+          ? { destinatarioId: texto(f, "destinatarioId") }
+          : {}),
+        ...(id ? { actuacionId: id } : {}),
+      };
     if (formulario === "RESPUESTA")
       payload = {
         id,
@@ -455,7 +525,7 @@ export default function SeguimientoLegajo({
                 Nueva actuación
               </button>
               <button className={botonLue} onClick={() => abrir("DERIVACION")}>
-                Derivar al SOE
+                Derivar
               </button>
               {e.legajoAbiertoEl && (
                 <button
@@ -517,7 +587,7 @@ export default function SeguimientoLegajo({
                   {
                     {
                       ACTUACION: "Nueva actuación",
-                      DERIVACION: "A · Quien deriva",
+                      DERIVACION: "Derivar",
                       RESPUESTA: "B · Respuesta del SOE",
                       SEGUIMIENTO: "C · Programar seguimiento",
                       RESOLVER_SEGUIMIENTO: "Registrar resultado",
@@ -538,7 +608,15 @@ export default function SeguimientoLegajo({
               {formulario === "ACTUACION" && (
                 <>
                   <Campo label="Tipo de actuación">
-                    <select className={inputLue} name="tipo">
+                    <select
+                      className={inputLue}
+                      name="tipo"
+                      value={tipoActuacion}
+                      onChange={(ev) => {
+                        setTipoActuacion(ev.target.value as TipoActuacion);
+                        setCausa("");
+                      }}
+                    >
                       {TIPOS_ACTUACION.filter(
                         (t) =>
                           equipo ||
@@ -555,21 +633,30 @@ export default function SeguimientoLegajo({
                       ))}
                     </select>
                   </Campo>
-                  {!e.legajoAbiertoEl && (
-                    <Campo label="Causa de apertura">
-                      <select
-                        className={inputLue}
-                        name="motivoApertura"
-                        required
-                      >
-                        <option value="">Seleccionar causa relevante</option>
-                        {MOTIVOS_APERTURA.map((t) => (
-                          <option key={t} value={t}>
-                            {MOTIVO_APERTURA_ETIQUETA[t]}
-                          </option>
-                        ))}
-                      </select>
-                    </Campo>
+                  <Campo
+                    label={
+                      e.legajoAbiertoEl ? "Causa" : "Causa de apertura"
+                    }
+                  >
+                    <select
+                      className={inputLue}
+                      name="causa"
+                      required
+                      value={causa}
+                      onChange={(ev) => setCausa(ev.target.value)}
+                    >
+                      <option value="" disabled>
+                        Seleccionar causa
+                      </option>
+                      {CAUSAS_ACTUACION[tipoActuacion].map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </Campo>
+                  {tipoActuacion === "PROTOCOLO" && causa && (
+                    <GuiaProtocoloPanel key={causa} causa={causa} />
                   )}
                   <Campo label="Resumen breve (máximo tres líneas)">
                     <textarea
@@ -581,7 +668,7 @@ export default function SeguimientoLegajo({
                       className={inputLue}
                     />
                   </Campo>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-3 sm:grid-cols-4">
                     <Campo label="Acta (si corresponde)">
                       <select name="tipoActa" className={inputLue}>
                         <option value="">Sin acta</option>
@@ -591,10 +678,28 @@ export default function SeguimientoLegajo({
                       </select>
                     </Campo>
                     <Campo label="Libro">
-                      <input name="actaLibro" className={inputLue} />
+                      <select name="actaLibro" className={inputLue}>
+                        <option value="">Seleccionar</option>
+                        {LIBROS_ACTA.map((l) => (
+                          <option key={l}>{l}</option>
+                        ))}
+                      </select>
                     </Campo>
                     <Campo label="Folio">
-                      <input name="actaFolio" className={inputLue} />
+                      <select name="actaFolio" className={inputLue}>
+                        <option value="">—</option>
+                        {Array.from({ length: FOLIO_MAX }, (_, i) => (
+                          <option key={i + 1}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </Campo>
+                    <Campo label="N.º de acta">
+                      <select name="actaNumero" className={inputLue}>
+                        <option value="">—</option>
+                        {Array.from({ length: NUMERO_ACTA_MAX }, (_, i) => (
+                          <option key={i + 1}>{i + 1}</option>
+                        ))}
+                      </select>
                     </Campo>
                   </div>
                   {equipo && (
@@ -602,37 +707,6 @@ export default function SeguimientoLegajo({
                       <input type="checkbox" name="confidencial" />
                       Contenido reservado al SOE y dirección
                     </label>
-                  )}
-                  {direccion && (
-                    <details className="rounded-lg bg-amber-50 p-3">
-                      <summary>
-                        Efectos: condicionalidad / resolución ICE
-                      </summary>
-                      <label className="my-3 flex gap-2 text-sm">
-                        <input type="checkbox" name="condicional" />
-                        Condicional por inasistencias (20 o más)
-                      </label>
-                      <Campo label="Puntos ICE de la resolución">
-                        <input
-                          name="puntosIce"
-                          type="number"
-                          min={0}
-                          max={25}
-                          defaultValue={0}
-                          className={inputLue}
-                        />
-                      </Campo>
-                      <Campo label="Descargo del estudiante">
-                        <textarea name="descargo" className={inputLue} />
-                      </Campo>
-                      <Campo label="Resolución del Consejo / medida y plazos">
-                        <textarea name="resolucion" className={inputLue} />
-                      </Campo>
-                      <p className="text-xs">
-                        El saldo oficial se actualiza desde GEI; esta actuación
-                        conserva la resolución y su respaldo.
-                      </p>
-                    </details>
                   )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Campo
@@ -689,10 +763,32 @@ export default function SeguimientoLegajo({
                     />
                   </Campo>
                   {formulario === "DERIVACION" && (
-                    <p className="text-xs">
-                      DNI {dni} · {e.anio}° {e.division} · La identidad de quien
-                      deriva se registra automáticamente.
-                    </p>
+                    <>
+                      {id && (
+                        <p className="rounded-lg bg-institucional-50 p-2 text-xs">
+                          Deriva la actuación:{" "}
+                          {datos.actuaciones.find((a) => a.id === id)?.motivo}
+                        </p>
+                      )}
+                      <Campo label="Derivar a">
+                        <select name="destinatarioId" className={inputLue}>
+                          <option value="">
+                            Todo el equipo SOE / dirección
+                          </option>
+                          {(datos.destinatarios ?? []).map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.nombre}
+                              {r.cargo ? ` · ${etiquetaCargo(r.cargo)}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </Campo>
+                      <p className="text-xs">
+                        DNI {dni} · {e.anio}° {e.division} · La identidad de
+                        quien deriva se registra automáticamente. Quien recibe
+                        la derivación ve el aviso al ingresar al sistema.
+                      </p>
+                    </>
                   )}
                 </>
               )}
@@ -1045,16 +1141,46 @@ export default function SeguimientoLegajo({
                             <p className="whitespace-pre-line text-sm">
                               {a.resumen}
                             </p>
+                            {"causa" in a && a.causa && (
+                              <p className="text-xs font-medium text-institucional-800">
+                                Causa: {a.causa}
+                              </p>
+                            )}
                             {"tipoActa" in a && a.tipoActa && (
                               <p className="mt-1 text-xs text-slate-500">
                                 {a.tipoActa} · Libro {a.actaLibro} · Folio{" "}
                                 {a.actaFolio}
+                                {a.actaNumero ? ` · Acta N.º ${a.actaNumero}` : ""}
                               </p>
                             )}
                             <p className="mt-1 text-xs text-slate-500">
-                              Registró: {a.autor.nombre} · {a.autor.rol} ·{" "}
+                              Registró: {a.autor.nombre} ·{" "}
+                              {etiquetaCargo(a.autor.cargo, a.autor.rol as Rol)} ·{" "}
                               {fecha(a.createdAt)}
                             </p>
+                            {(datos.intervencionesSoe ?? []).some(
+                              (i) => i.actuacionId === a.id,
+                            ) && (
+                              <div className="mt-2 rounded-lg bg-rose-50/60 p-2 text-xs">
+                                <p className="font-semibold text-slate-700">
+                                  Intervenciones del SOE vinculadas
+                                </p>
+                                <ul className="mt-1 space-y-0.5 text-slate-600">
+                                  {(datos.intervencionesSoe ?? [])
+                                    .filter((i) => i.actuacionId === a.id)
+                                    .map((i) => (
+                                      <li key={i.id}>
+                                        {fecha(i.fecha)} ·{" "}
+                                        {TIPO_INTERVENCION_ETIQUETA[
+                                          i.tipo as TipoIntervencion
+                                        ] ?? i.tipo}{" "}
+                                        · {i.motivo} · Intervino:{" "}
+                                        {i.profesional.nombre}
+                                      </li>
+                                    ))}
+                                </ul>
+                              </div>
+                            )}
                             {a.anuladaEl && (
                               <p className="text-sm text-red-700">
                                 Anulada el {fecha(a.anuladaEl)} ·{" "}
@@ -1062,6 +1188,14 @@ export default function SeguimientoLegajo({
                                   ? a.motivoAnulacion
                                   : ""}
                               </p>
+                            )}
+                            {editable && !a.anuladaEl && (
+                              <button
+                                className="mr-3 mt-2 text-xs font-semibold text-institucional-700 underline print:hidden"
+                                onClick={() => abrir("DERIVACION", a.id)}
+                              >
+                                Derivar esta actuación
+                              </button>
                             )}
                             {direccion && editable && !a.anuladaEl && (
                               <button
@@ -1077,7 +1211,7 @@ export default function SeguimientoLegajo({
                   ))}
               </section>
               <section className="rounded-xl bg-white p-4">
-                <h4 className="mb-3 font-bold">Derivaciones al SOE</h4>
+                <h4 className="mb-3 font-bold">Derivaciones</h4>
                 {!datos.derivaciones.length && (
                   <p className="text-sm text-slate-500">
                     Sin derivaciones visibles.
@@ -1092,7 +1226,8 @@ export default function SeguimientoLegajo({
                       {fecha(d.fecha)} · {d.estado}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Derivó: {d.derivadoPor.nombre}
+                      Derivó: {d.derivadoPor.nombre} · Para:{" "}
+                      {d.destinatario?.nombre ?? "Equipo SOE / dirección"}
                     </p>
                     <p className="my-2 text-sm">{d.motivo}</p>
                     {"accionesSoe" in d && d.accionesSoe && (
@@ -1107,7 +1242,7 @@ export default function SeguimientoLegajo({
                     )}
                     {editable && d.estado !== "CERRADA" && (
                       <div className="mt-3 flex flex-wrap gap-2 print:hidden">
-                        {equipo && (
+                        {(equipo || d.paraMi) && (
                           <button
                             className={botonLue}
                             onClick={() => abrir("RESPUESTA", d.id)}
@@ -1128,6 +1263,7 @@ export default function SeguimientoLegajo({
               </section>
             </div>
             <div className="space-y-4">
+              <AgentesIntervinientes datos={datos} />
               <section className="rounded-xl bg-white p-4">
                 <h4 className="mb-3 font-bold">
                   Seguimientos pendientes e historial

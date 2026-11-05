@@ -14,6 +14,7 @@ import {
   situacionSchema,
   fichaSchema,
   validarApertura,
+  motivoAperturaDesde,
   inasistenciasAnuales,
   diaLocal,
   estadoVigencia,
@@ -77,20 +78,24 @@ export async function cargarSeguimiento(
     situaciones,
     fichas,
     responsables,
+    intervencionesSoe,
   ] = await Promise.all([
     prisma.actuacion.findMany({
       where: { estudianteId: e.id },
       orderBy: [{ cicloLectivo: "desc" }, { fecha: "desc" }],
-      include: { autor: { select: { nombre: true, rol: true } } },
+      include: { autor: { select: { nombre: true, rol: true, cargo: true } } },
     }),
     prisma.derivacion.findMany({
       where: {
         estudianteId: e.id,
-        ...(!equipo ? { derivadoPorId: u.id } : {}),
+        ...(!equipo
+          ? { OR: [{ derivadoPorId: u.id }, { destinatarioId: u.id }] }
+          : {}),
       },
       orderBy: { fecha: "desc" },
       include: {
         derivadoPor: { select: { nombre: true } },
+        destinatario: { select: { id: true, nombre: true } },
         profesionalSoe: { select: { nombre: true } },
       },
     }),
@@ -157,8 +162,23 @@ export async function cargarSeguimiento(
         rol: { not: "DOCENTE" },
         perfilSeguimiento: { isNot: null },
       },
-      select: { id: true, nombre: true, perfilSeguimiento: true },
+      select: { id: true, nombre: true, cargo: true, perfilSeguimiento: true },
     }),
+    // Solo el equipo (SOE / dirección) ve qué intervenciones del SOE hubo; el informe sigue en el legajo.
+    equipo
+      ? prisma.intervencionSoe.findMany({
+          where: { estudianteId: e.id },
+          orderBy: { fecha: "desc" },
+          select: {
+            id: true,
+            fecha: true,
+            tipo: true,
+            motivo: true,
+            actuacionId: true,
+            profesional: { select: { nombre: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
   await prisma.auditLog.create({
     data: { usuarioId: u.id, estudianteDni: dni, accion: "VER_LEGAJO" },
@@ -185,14 +205,16 @@ export async function cargarSeguimiento(
     ),
     derivaciones: derivaciones.map((d) =>
       equipo
-        ? d
+        ? { ...d, paraMi: d.destinatarioId === u.id }
         : {
+            paraMi: d.destinatarioId === u.id,
             id: d.id,
             fecha: d.fecha,
             motivo: d.motivo,
             estado: d.estado,
             respuesta: d.respuesta,
             derivadoPor: d.derivadoPor,
+            destinatario: d.destinatario,
           },
     ),
     seguimientos,
@@ -223,6 +245,11 @@ export async function cargarSeguimiento(
             })()),
       )
       .map((r) => ({ id: r.id, nombre: r.nombre })),
+    // Cualquier usuario del circuito puede recibir una derivación (no a uno mismo).
+    destinatarios: responsables
+      .filter((r) => r.id !== u.id)
+      .map((r) => ({ id: r.id, nombre: r.nombre, cargo: r.cargo })),
+    intervencionesSoe,
   };
 }
 export type SeguimientoDatos = Awaited<ReturnType<typeof cargarSeguimiento>>;
@@ -362,7 +389,10 @@ export async function escribirSeguimiento(
             400,
             "La apertura requiere el primer seguimiento con fecha y responsable.",
           );
-        await abrir(d.motivoApertura, d.motivo);
+        await abrir(
+          d.motivoApertura ?? motivoAperturaDesde(d.tipo, d.causa),
+          `${d.causa} · ${d.motivo}`,
+        );
         const incidente = d.puntosIce
           ? await tx.incidenteConvivencia.create({
               data: {
@@ -388,9 +418,11 @@ export async function escribirSeguimiento(
             tipo: d.tipo,
             motivo: d.motivo,
             resumen: d.resumen,
+            causa: d.causa || null,
             tipoActa: d.tipoActa || null,
             actaLibro: d.actaLibro || null,
             actaFolio: d.actaFolio || null,
+            actaNumero: d.actaNumero || null,
             confidencial: d.confidencial,
             puntosIce: d.puntosIce || null,
             incidenteId: incidente?.id,
@@ -421,15 +453,52 @@ export async function escribirSeguimiento(
         const d = derivacionSchema.parse(datos);
         if (d.fecha > diaLocal())
           throw new ApiError(400, "La derivación no puede ser futura.");
+        const destinatario = d.destinatarioId
+          ? await tx.usuario.findUnique({
+              where: { id: d.destinatarioId },
+              select: {
+                id: true,
+                activo: true,
+                rol: true,
+                nombre: true,
+                perfilSeguimiento: { select: { funcion: true } },
+              },
+            })
+          : null;
+        if (
+          d.destinatarioId &&
+          (!destinatario?.activo ||
+            destinatario.rol === "DOCENTE" ||
+            !destinatario.perfilSeguimiento ||
+            destinatario.id === u.id)
+        )
+          throw new ApiError(
+            400,
+            "El destinatario debe ser otro usuario activo del circuito de seguimiento.",
+          );
+        const origen = d.actuacionId
+          ? await tx.actuacion.findFirst({
+              where: { id: d.actuacionId, estudianteId: e.id, anuladaEl: null },
+              select: { id: true, derivacionId: true },
+            })
+          : null;
+        if (d.actuacionId && !origen)
+          throw new ApiError(400, "La actuación a derivar no existe o fue anulada.");
         await abrir("DERIVACION_SOE", d.motivo);
         const derivacion = await tx.derivacion.create({
           data: {
             estudianteId: e.id,
             derivadoPorId: u.id,
+            destinatarioId: destinatario?.id ?? null,
             fecha: new Date(d.fecha),
             motivo: d.motivo,
           },
         });
+        if (origen && !origen.derivacionId)
+          await tx.actuacion.update({
+            where: { id: origen.id },
+            data: { derivacionId: derivacion.id },
+          });
         await primerSeguimiento(d, derivacion.id);
         await tx.actuacion.create({
           data: {
@@ -438,24 +507,31 @@ export async function escribirSeguimiento(
             fecha: new Date(d.fecha),
             cicloLectivo: Number(d.fecha.slice(0, 4)),
             tipo: "OTRA",
-            motivo: "Derivación al SOE",
+            motivo: destinatario
+              ? `Derivación a ${destinatario.nombre}`
+              : "Derivación al SOE",
             resumen: d.motivo,
             derivacionId: derivacion.id,
           },
         });
-        const equipo = await tx.usuario.findMany({
-          where: {
-            activo: true,
-            perfilSeguimiento: { funcion: { in: ["DIRECCION", "SOE"] } },
-          },
-          select: { id: true },
-        });
+        const equipo = destinatario
+          ? [{ id: destinatario.id }]
+          : await tx.usuario.findMany({
+              where: {
+                activo: true,
+                id: { not: u.id },
+                perfilSeguimiento: { funcion: { in: ["DIRECCION", "SOE"] } },
+              },
+              select: { id: true },
+            });
         await tx.notificacion.createMany({
           data: equipo.map((r) => ({
             usuarioId: r.id,
             tipo: "DERIVACION_RECIBIDA",
-            titulo: "Nueva derivación al SOE",
-            mensaje: "Hay una derivación pendiente de recepción.",
+            titulo: destinatario
+              ? `Ticket #${derivacion.numero} · Nueva derivación para usted`
+              : `Ticket #${derivacion.numero} · Nueva derivación al SOE`,
+            mensaje: `${u.nombre} derivó a ${e.apellidos}, ${e.nombres} (${e.anio}.º ${e.division}).`,
             estudianteId: e.id,
             derivacionId: derivacion.id,
             enlace: `/?seguimiento=${dni}`,
@@ -463,12 +539,13 @@ export async function escribirSeguimiento(
         });
         audit = "CARGAR_DERIVACION";
       } else if (accion === "RESPUESTA") {
-        exigirEquipo(p);
         const d = respuestaSchema.parse(datos);
         const previo = await tx.derivacion.findFirst({
           where: { id: d.id, estudianteId: e.id },
         });
         if (!previo) throw new ApiError(404, "Derivación inexistente.");
+        // Responde el equipo SOE / dirección, o quien recibió la derivación.
+        if (previo.destinatarioId !== u.id) exigirEquipo(p);
         if (previo.estado === "CERRADA")
           throw new ApiError(409, "La derivación ya está cerrada.");
         if (
@@ -750,7 +827,10 @@ export async function bandeja(p: Perfil, u: UsuarioSesion) {
         trayectoria: true,
         asistencias: true,
         derivaciones: {
-          where: p.funcion === "PRECEPTORIA" ? { derivadoPorId: u.id } : {},
+          where:
+            p.funcion === "PRECEPTORIA"
+              ? { OR: [{ derivadoPorId: u.id }, { destinatarioId: u.id }] }
+              : {},
           select: { id: true, estado: true },
         },
         seguimientos: {

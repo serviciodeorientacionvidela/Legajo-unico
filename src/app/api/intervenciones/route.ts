@@ -34,6 +34,7 @@ const esquemaIntervencion = z
       .nullish()
       .transform((v) => v ?? null),
     proximoSeguimiento: z.coerce.date().nullish().transform((v) => v ?? null),
+    actuacionId: z.string().max(40).nullish().transform((v) => v || null),
   })
   .refine((d) => d.fecha.getTime() <= Date.now() + 60_000, { message: "La fecha no puede ser futura.", path: ["fecha"] })
   .refine((d) => d.proximoSeguimiento === null || d.proximoSeguimiento.getTime() >= d.fecha.getTime(), {
@@ -54,6 +55,13 @@ export async function POST(req: Request) {
 
     const estudiante = await prisma.estudiante.findUnique({ where: { dni: datos.dni }, select: { id: true } });
     if (!estudiante) throw new ApiError(404, "No existe un estudiante con ese DNI.");
+    if (datos.actuacionId) {
+      const actuacion = await prisma.actuacion.findFirst({
+        where: { id: datos.actuacionId, estudianteId: estudiante.id, anuladaEl: null },
+        select: { id: true },
+      });
+      if (!actuacion) throw new ApiError(400, "La actuación elegida no pertenece a este legajo o fue anulada.");
+    }
 
     const intervencion = await prisma.intervencionSoe.create({
       data: {
@@ -67,6 +75,7 @@ export async function POST(req: Request) {
         acuerdosDocentes: datos.acuerdosDocentes,
         archivoDriveUrl: datos.archivoDriveUrl,
         proximoSeguimiento: datos.proximoSeguimiento,
+        actuacionId: datos.actuacionId,
       },
     });
 

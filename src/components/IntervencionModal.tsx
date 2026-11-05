@@ -3,12 +3,21 @@
 import { Info, Loader2, Lock, Users } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { NuevaIntervencion } from "@/lib/dataSource";
-import { TIPO_INTERVENCION_ETIQUETA, TIPOS_INTERVENCION, type TipoIntervencion } from "@/lib/types";
+import { formatearFecha } from "@/lib/formato";
+import {
+  TIPO_ACTUACION_ETIQUETA,
+  TIPO_INTERVENCION_ETIQUETA,
+  TIPOS_INTERVENCION,
+  type ActuacionVinculable,
+  type TipoIntervencion,
+} from "@/lib/types";
 import { MensajeError, Modal } from "./ui";
 
 interface Props {
   abierto: boolean;
   estudiante: { dni: string; nombreCompleto: string } | null;
+  /** Actuaciones vigentes del legajo, para vincular la intervención al caso. */
+  actuaciones?: ActuacionVinculable[];
   onCerrar: () => void;
   onGuardar: (datos: NuevaIntervencion) => Promise<void>;
 }
@@ -19,7 +28,7 @@ export function hoyIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function IntervencionModal({ abierto, estudiante, onCerrar, onGuardar }: Props) {
+export default function IntervencionModal({ abierto, estudiante, actuaciones = [], onCerrar, onGuardar }: Props) {
   const [fecha, setFecha] = useState(hoyIso());
   const [tipo, setTipo] = useState<TipoIntervencion>("ENTREVISTA_ESTUDIANTE");
   const [participantes, setParticipantes] = useState("");
@@ -28,6 +37,7 @@ export default function IntervencionModal({ abierto, estudiante, onCerrar, onGua
   const [acuerdos, setAcuerdos] = useState("");
   const [archivo, setArchivo] = useState("");
   const [seguimiento, setSeguimiento] = useState("");
+  const [actuacionId, setActuacionId] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +51,7 @@ export default function IntervencionModal({ abierto, estudiante, onCerrar, onGua
     setAcuerdos("");
     setArchivo("");
     setSeguimiento("");
+    setActuacionId("");
     setError(null);
   }, [abierto]);
 
@@ -68,6 +79,7 @@ export default function IntervencionModal({ abierto, estudiante, onCerrar, onGua
         acuerdosDocentes: acuerdos.trim(),
         archivoDriveUrl: archivo.trim() || null,
         proximoSeguimiento: seguimiento || null,
+        actuacionId: actuacionId || null,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -101,6 +113,21 @@ export default function IntervencionModal({ abierto, estudiante, onCerrar, onGua
             </select>
           </label>
         </div>
+
+        <label className="etiqueta-campo">
+          Vincular a una actuación del legajo
+          <select value={actuacionId} onChange={(e) => setActuacionId(e.target.value)} className="campo">
+            <option value="">Sin vincular</option>
+            {actuaciones.map((a) => (
+              <option key={a.id} value={a.id}>
+                {formatearFecha(a.fecha)} · {TIPO_ACTUACION_ETIQUETA[a.tipo]} · {a.motivo}
+              </option>
+            ))}
+          </select>
+          <span className="ayuda-campo">
+            Agrupa esta intervención con la actuación en la línea de tiempo, para seguir el caso aunque intervengan varias personas.
+          </span>
+        </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="etiqueta-campo">

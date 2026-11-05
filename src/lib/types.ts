@@ -13,6 +13,72 @@ export const ROL_ETIQUETA: Record<Rol, string> = {
   DOCENTE: "Nivel 1 · Docente",
 };
 
+/** Cargo institucional del usuario. Define el nivel de acceso (rol) y la función en el seguimiento. */
+export const CARGOS = [
+  "DIRECTOR",
+  "VICEDIRECTOR",
+  "REGENTE",
+  "COORDINADOR_PEDAGOGICO_1",
+  "COORDINADOR_PEDAGOGICO_2",
+  "COORDINADOR_PEDAGOGICO_3",
+  "ORIENTADOR_SOCIAL",
+  "ORIENTADOR_PSICOPEDAGOGICO",
+  "JEFE_PRECEPTORES",
+  "PRECEPTOR",
+  "DOCENTE",
+] as const;
+export type Cargo = (typeof CARGOS)[number];
+
+export const CARGO_ETIQUETA: Record<Cargo, string> = {
+  DIRECTOR: "Director/a",
+  VICEDIRECTOR: "Vicedirector/a",
+  REGENTE: "Regente",
+  COORDINADOR_PEDAGOGICO_1: "Coordinador/a pedagógico/a 1.er año",
+  COORDINADOR_PEDAGOGICO_2: "Coordinador/a pedagógico/a 2.º año",
+  COORDINADOR_PEDAGOGICO_3: "Coordinador/a pedagógico/a 3.er año",
+  ORIENTADOR_SOCIAL: "Orientador/a social",
+  ORIENTADOR_PSICOPEDAGOGICO: "Orientador/a psicopedagógico/a",
+  JEFE_PRECEPTORES: "Jefe/a de preceptores/as",
+  PRECEPTOR: "Preceptor/a",
+  DOCENTE: "Docente",
+};
+
+/** Todos los cargos de conducción y orientación tienen acceso Directivo / SOE; preceptores y docentes no. */
+export const CARGO_ROL: Record<Cargo, Rol> = {
+  DIRECTOR: "DIRECTIVO_SOE",
+  VICEDIRECTOR: "DIRECTIVO_SOE",
+  REGENTE: "DIRECTIVO_SOE",
+  COORDINADOR_PEDAGOGICO_1: "DIRECTIVO_SOE",
+  COORDINADOR_PEDAGOGICO_2: "DIRECTIVO_SOE",
+  COORDINADOR_PEDAGOGICO_3: "DIRECTIVO_SOE",
+  ORIENTADOR_SOCIAL: "DIRECTIVO_SOE",
+  ORIENTADOR_PSICOPEDAGOGICO: "DIRECTIVO_SOE",
+  JEFE_PRECEPTORES: "DIRECTIVO_SOE",
+  PRECEPTOR: "PRECEPTOR",
+  DOCENTE: "DOCENTE",
+};
+
+/** Función en el circuito de seguimiento que corresponde a cada cargo (null: sin circuito). */
+export const CARGO_FUNCION: Record<Cargo, "DIRECCION" | "SOE" | "PRECEPTORIA" | null> = {
+  DIRECTOR: "DIRECCION",
+  VICEDIRECTOR: "DIRECCION",
+  REGENTE: "DIRECCION",
+  COORDINADOR_PEDAGOGICO_1: "SOE",
+  COORDINADOR_PEDAGOGICO_2: "SOE",
+  COORDINADOR_PEDAGOGICO_3: "SOE",
+  ORIENTADOR_SOCIAL: "SOE",
+  ORIENTADOR_PSICOPEDAGOGICO: "SOE",
+  JEFE_PRECEPTORES: "SOE",
+  PRECEPTOR: "PRECEPTORIA",
+  DOCENTE: null,
+};
+
+/** Etiqueta del cargo, o del rol si el usuario todavía no tiene cargo asignado. */
+export function etiquetaCargo(cargo: string | null | undefined, rol?: Rol): string {
+  if (cargo && cargo in CARGO_ETIQUETA) return CARGO_ETIQUETA[cargo as Cargo];
+  return rol ? ROL_ETIQUETA[rol] : "";
+}
+
 export const TIPOS_INCIDENTE = ["LEVE", "MODERADA", "GRAVE", "ACUERDO_PEDAGOGICO"] as const;
 export type TipoIncidente = (typeof TIPOS_INCIDENTE)[number];
 
@@ -51,6 +117,8 @@ export const TIPOS_ACTUACION = [
   "ESCOLARIDAD_PROTEGIDA",
   "DEPORTISTA_FEDERADO",
   "INCLUSION_PPI",
+  "GENERO",
+  "ESCUELA_DOMICILIARIA",
   "OTRA",
 ] as const;
 export type TipoActuacion = (typeof TIPOS_ACTUACION)[number];
@@ -64,15 +132,66 @@ export const TIPO_ACTUACION_ETIQUETA: Record<TipoActuacion, string> = {
   ESCOLARIDAD_PROTEGIDA: "Escolaridad protegida",
   DEPORTISTA_FEDERADO: "Deportista federado",
   INCLUSION_PPI: "Inclusión / PPI",
+  GENERO: "Género",
+  ESCUELA_DOMICILIARIA: "Escuela domiciliaria",
   OTRA: "Otra",
 };
 
+/** Causas posibles según el tipo de actuación (Actuacion.causa, texto libre en la base). */
+export const CAUSAS_ACTUACION: Record<TipoActuacion, readonly string[]> = {
+  INASISTENCIAS: [
+    "+5 inasistencias",
+    "+15 inasistencias",
+    "+20 inasistencias",
+    "Condicionalidad",
+    "15 inasistencias consecutivas",
+    "Extensión de inasistencias",
+    "Otros",
+  ],
+  CONVIVENCIA_ICE: [
+    "Falta grave",
+    "Falta extremadamente grave",
+    "Reiteración de faltas",
+    "Falta innegociable",
+    "Por Consejo Escolar",
+  ],
+  FAMILIA: ["Salud física", "Salud mental", "Otros"],
+  SALUD: ["Salud física", "Salud mental", "Otros"],
+  PROTOCOLO: [
+    "Dec. 1187",
+    "Bullying",
+    "Amenazas virales",
+    "Amenazas de intimidación pública",
+    "Protocolo de ambulancia",
+    "Otros",
+  ],
+  ESCOLARIDAD_PROTEGIDA: ["Otros"],
+  DEPORTISTA_FEDERADO: ["Otros"],
+  INCLUSION_PPI: ["Docente acompañante", "Valoración", "PPI"],
+  GENERO: ["Otros"],
+  ESCUELA_DOMICILIARIA: ["Otros"],
+  OTRA: ["Otros"],
+};
+
+/** Libros de actas institucionales. */
+export const LIBROS_ACTA = [
+  "SOE",
+  "Gestión",
+  "Estudiante",
+  "Familia",
+  "Preceptoría",
+  "Consejo Escolar",
+  "Abanderados y escoltas",
+] as const;
+export const FOLIO_MAX = 200;
+export const NUMERO_ACTA_MAX = 500;
+
 /** Valores de Actuacion.tipoActa (texto libre en la base para poder sumar tipos sin migrar). */
 export const TIPOS_ACTA = [
-  "Acta compromiso",
+  "Acta",
   "Citación con familia",
   "Entrevista con familia",
-  "Acta de descargo",
+  "Entrevista con estudiante",
   "Intervención territorial",
   "Otra acta",
 ] as const;
@@ -198,7 +317,10 @@ export const TIPOS_INTERVENCION = [
   "ENTREVISTA_FAMILIA",
   "REUNION_DOCENTES",
   "OBSERVACION_AULICA",
+  "DERIVACION_INTERNA",
   "DERIVACION_EXTERNA",
+  "DERIVACION_SUPERVISION",
+  "ACUERDO_EQUIPOS_EXTERNOS",
   "OTRA",
 ] as const;
 export type TipoIntervencion = (typeof TIPOS_INTERVENCION)[number];
@@ -208,7 +330,10 @@ export const TIPO_INTERVENCION_ETIQUETA: Record<TipoIntervencion, string> = {
   ENTREVISTA_FAMILIA: "Entrevista con la familia",
   REUNION_DOCENTES: "Reunión con docentes",
   OBSERVACION_AULICA: "Observación áulica",
+  DERIVACION_INTERNA: "Derivación interna",
   DERIVACION_EXTERNA: "Derivación externa",
+  DERIVACION_SUPERVISION: "Derivación desde supervisión",
+  ACUERDO_EQUIPOS_EXTERNOS: "Acuerdo con equipos externos",
   OTRA: "Otra intervención",
 };
 
@@ -290,6 +415,7 @@ export interface IntervencionFuente {
   acuerdosDocentes: string;
   archivoDriveUrl: string | null;
   profesional: { nombre: string };
+  actuacion?: { id: string; fecha: Fecha; motivo: string } | null;
 }
 
 export interface TrayectoriaFuente {
@@ -347,6 +473,7 @@ export interface LegajoFuente extends EstudianteFuente {
   alertas: AlertaTempranaFuente[];
   faltasIce: FaltaIceFuente[];
   asistencias: AsistenciaMensualFuente[];
+  actuaciones?: { id: string; fecha: Fecha; tipo: string; motivo: string; anuladaEl: Fecha | null }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +586,16 @@ export interface IntervencionVisible {
   acuerdosDocentes: string;
   archivoDriveUrl: string | null;
   profesionalNombre: string;
+  /** Actuación de la línea de tiempo a la que se vinculó. */
+  actuacion: { id: string; fecha: string; motivo: string } | null;
+}
+
+/** Actuación resumida para vincular intervenciones del SOE. */
+export interface ActuacionVinculable {
+  id: string;
+  fecha: string;
+  tipo: TipoActuacion;
+  motivo: string;
 }
 
 export interface LegajoVisible {
@@ -506,6 +643,7 @@ export interface LegajoVisible {
     vencimientoCud: string | null;
     observacionesConfidenciales: string | null;
     intervenciones: IntervencionVisible[];
+    actuaciones: ActuacionVinculable[];
   } | null;
   drive: {
     carpetaAlumno: string | null;
@@ -550,6 +688,7 @@ export interface UsuarioAdministrado {
   nombre: string;
   dni: string | null;
   rol: Rol;
+  cargo: Cargo | null;
   activo: boolean;
   esAdministrador: boolean;
   fotoVersion: string | null;

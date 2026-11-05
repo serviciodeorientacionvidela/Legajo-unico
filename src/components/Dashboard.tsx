@@ -7,7 +7,10 @@ import {
   Info,
   Loader2,
   LogOut,
+  MessageSquare,
   RotateCcw,
+  Scale,
+  Ticket,
   Search,
   ShieldCheck,
   UserCog,
@@ -21,6 +24,7 @@ import {
   crearFuenteDemo,
   ErrorFuenteDatos,
   reiniciarDemo,
+  solicitar,
   type DatosConfidenciales,
   type NuevaIntervencion,
   type NuevoIncidente,
@@ -37,6 +41,10 @@ import {
   type UsuarioSesion,
 } from "@/lib/types";
 import AuditoriaPanel from "./AuditoriaPanel";
+import AvisosIngreso from "./AvisosIngreso";
+import MensajesPanel from "./MensajesPanel";
+import { NormativaPanel } from "./Protocolos";
+import TicketsPanel from "./TicketsPanel";
 import Avatar, { urlFotoUsuario } from "./Avatar";
 import ConfidencialModal from "./ConfidencialModal";
 import ImportGeiModal from "./ImportGeiModal";
@@ -228,7 +236,21 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   const [modalIntervencion, setModalIntervencion] = useState(false);
   const [modalConfidencial, setModalConfidencial] = useState(false);
   const [modalInforme, setModalInforme] = useState(false);
-  const [vista, setVista] = useState<"estudiantes" | "informes" | "usuarios" | "seguimiento">("estudiantes");
+  const [vista, setVista] = useState<
+    "estudiantes" | "informes" | "usuarios" | "seguimiento" | "tickets" | "mensajes" | "normativa"
+  >("estudiantes");
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0);
+  const actualizarNoLeidos = useCallback(() => {
+    if (modoDemo) return;
+    solicitar<{ noLeidos: number }>("/api/mensajes?resumen=1")
+      .then((r) => setMensajesNoLeidos(r.noLeidos))
+      .catch(() => undefined);
+  }, [modoDemo]);
+  useEffect(() => {
+    actualizarNoLeidos();
+    const t = window.setInterval(actualizarNoLeidos, 60_000);
+    return () => window.clearInterval(t);
+  }, [actualizarNoLeidos]);
   useEffect(() => { if (new URLSearchParams(window.location.search).has("seguimiento")) setVista("seguimiento"); }, []);
 
   const cargarLegajo = useCallback(
@@ -440,6 +462,22 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           <BotonMenu activo={vista === "estudiantes"} onClick={() => setVista("estudiantes")} icono={<Users className="h-4 w-4" aria-hidden />}>
             Estudiantes
           </BotonMenu>
+          {!modoDemo && rol !== "DOCENTE" && (
+            <BotonMenu activo={vista === "tickets"} onClick={() => setVista("tickets")} icono={<Ticket className="h-4 w-4" aria-hidden />}>
+              Tickets
+            </BotonMenu>
+          )}
+          {!modoDemo && (
+            <BotonMenu activo={vista === "mensajes"} onClick={() => setVista("mensajes")} icono={<MessageSquare className="h-4 w-4" aria-hidden />}>
+              Mensajes
+              {mensajesNoLeidos > 0 && (
+                <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-xs font-bold text-white">{mensajesNoLeidos}</span>
+              )}
+            </BotonMenu>
+          )}
+          <BotonMenu activo={vista === "normativa"} onClick={() => setVista("normativa")} icono={<Scale className="h-4 w-4" aria-hidden />}>
+            Normativa
+          </BotonMenu>
           {tienePermiso(rol, "GENERAR_INFORMES") && (
             <BotonMenu activo={vista === "informes"} onClick={() => setVista("informes")} icono={<ChartColumn className="h-4 w-4" aria-hidden />}>
               Informes
@@ -492,7 +530,15 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div>
             <h2 className="text-lg font-bold text-institucional-950">
-              {vista === "seguimiento" ? "Seguimiento LUE" : vista === "informes" ? "Informes" : vista === "usuarios" ? "Usuarios" : "Estudiantes"}
+              {{
+                seguimiento: "Seguimiento LUE",
+                informes: "Informes",
+                usuarios: "Usuarios",
+                tickets: "Tickets",
+                mensajes: "Mensajes",
+                normativa: "Normativa",
+                estudiantes: "Estudiantes",
+              }[vista]}
             </h2>
             <p className="text-xs text-slate-500">
               {vista === "informes"
@@ -544,7 +590,13 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       )}
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-        {vista === "seguimiento" && rol !== "DOCENTE" ? (
+        {vista === "tickets" && !modoDemo && rol !== "DOCENTE" ? (
+          <TicketsPanel onVerLegajo={setDniAbierto} />
+        ) : vista === "mensajes" && !modoDemo ? (
+          <MensajesPanel onCambioNoLeidos={actualizarNoLeidos} />
+        ) : vista === "normativa" ? (
+          <NormativaPanel />
+        ) : vista === "seguimiento" && rol !== "DOCENTE" ? (
           <SeguimientoPanel modoDemo={modoDemo} rol={rol} administrador={esAdministrador} />
         ) : vista === "usuarios" && esAdministrador ? (
           <UsuariosPanel
@@ -557,6 +609,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           <InformesPanel cargar={cargarInforme} emisor={`${usuario.nombre} (${ROL_ETIQUETA[rol]})`} onVerLegajo={setDniAbierto} onError={esErrorDeSesion} />
         ) : (
         <>
+        {!modoDemo && rol !== "DOCENTE" && <AvisosIngreso onVerLegajo={setDniAbierto} />}
         <MetricCards metricas={metricas} onFiltroRapido={aplicarFiltroRapido} />
 
         <section className="space-y-3">
@@ -651,6 +704,7 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
       <IntervencionModal
         abierto={modalIntervencion}
         estudiante={estudianteAbierto}
+        actuaciones={legajo?.confidencial?.actuaciones ?? []}
         onCerrar={() => setModalIntervencion(false)}
         onGuardar={guardarIntervencion}
       />

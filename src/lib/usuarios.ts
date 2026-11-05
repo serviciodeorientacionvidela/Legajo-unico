@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ApiError } from "./api";
-import { ROLES, type UsuarioAdministrado, type UsuarioSesion } from "./types";
+import type { Prisma } from "@prisma/client";
+import { CARGO_FUNCION, CARGOS, ROLES, type Cargo, type UsuarioAdministrado, type UsuarioSesion } from "./types";
 
 /** Tope de la foto como data URL (~150 KB de imagen); el navegador la reduce antes a 256 px. */
 const FOTO_MAX_CARACTERES = 200_000;
@@ -24,6 +25,7 @@ export const esquemaNuevoUsuario = z.object({
   email: z.string().trim().toLowerCase().email().max(200),
   dni: esquemaDni.nullable().optional(),
   rol: z.enum(ROLES),
+  cargo: z.enum(CARGOS).nullable().optional(),
   password: esquemaPassword,
   esAdministrador: z.boolean().optional(),
   foto: esquemaFoto.nullable().optional(),
@@ -34,6 +36,7 @@ export const esquemaEdicionUsuario = z.object({
   email: z.string().trim().toLowerCase().email().max(200).optional(),
   dni: esquemaDni.nullable().optional(),
   rol: z.enum(ROLES).optional(),
+  cargo: z.enum(CARGOS).nullable().optional(),
   activo: z.boolean().optional(),
   esAdministrador: z.boolean().optional(),
   password: esquemaPassword.optional(),
@@ -50,6 +53,7 @@ export const SELECCION_USUARIO = {
   nombre: true,
   dni: true,
   rol: true,
+  cargo: true,
   activo: true,
   esAdministrador: true,
   fotoActualizada: true,
@@ -62,6 +66,7 @@ export function aUsuarioAdministrado(u: {
   nombre: string;
   dni: string | null;
   rol: UsuarioAdministrado["rol"];
+  cargo: string | null;
   activo: boolean;
   esAdministrador: boolean;
   fotoActualizada: Date | null;
@@ -73,11 +78,34 @@ export function aUsuarioAdministrado(u: {
     nombre: u.nombre,
     dni: u.dni,
     rol: u.rol,
+    cargo: (CARGOS as readonly string[]).includes(u.cargo ?? "") ? (u.cargo as Cargo) : null,
     activo: u.activo,
     esAdministrador: u.esAdministrador,
     fotoVersion: u.fotoActualizada?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
   };
+}
+
+/**
+ * Deja el perfil de seguimiento alineado con el cargo: conducción y orientación quedan en
+ * DIRECCION / SOE; preceptoría conserva sus cursos asignados (los carga administración).
+ */
+export async function sincronizarPerfilCargo(
+  tx: Pick<Prisma.TransactionClient, "perfilSeguimiento">,
+  usuarioId: string,
+  cargo: Cargo | null | undefined,
+): Promise<void> {
+  if (!cargo) return;
+  const funcion = CARGO_FUNCION[cargo];
+  if (!funcion) {
+    await tx.perfilSeguimiento.deleteMany({ where: { usuarioId } });
+    return;
+  }
+  await tx.perfilSeguimiento.upsert({
+    where: { usuarioId },
+    create: { usuarioId, funcion, cursos: [] },
+    update: { funcion },
+  });
 }
 
 /** Traduce el error de unicidad de Prisma (email o DNI repetido) a un mensaje claro. */

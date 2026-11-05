@@ -8,7 +8,9 @@ import {
   esquemaNuevoUsuario,
   exigirAdministrador,
   SELECCION_USUARIO,
+  sincronizarPerfilCargo,
 } from "@/lib/usuarios";
+import { CARGO_ROL } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -37,7 +39,8 @@ export async function POST(req: Request) {
           nombre: datos.nombre,
           email: datos.email,
           dni: datos.dni ?? null,
-          rol: datos.rol,
+          rol: datos.cargo ? CARGO_ROL[datos.cargo] : datos.rol,
+          cargo: datos.cargo ?? null,
           esAdministrador: datos.esAdministrador ?? false,
           passwordHash: await bcrypt.hash(datos.password, 12),
           fotoPerfil: datos.foto ?? null,
@@ -46,6 +49,7 @@ export async function POST(req: Request) {
         select: SELECCION_USUARIO,
       })
       .catch(errorDuplicado);
+    await sincronizarPerfilCargo(prisma, creado.id, datos.cargo);
 
     await registrarAuditoria(usuario.id, null, "GESTIONAR_USUARIO", obtenerIp(req));
     return await jsonConSesion({ usuario: aUsuarioAdministrado(creado) }, usuario, { status: 201 });

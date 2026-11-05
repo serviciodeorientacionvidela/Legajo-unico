@@ -72,6 +72,8 @@ export interface NuevaIntervencion {
   archivoDriveUrl: string | null;
   /** AAAA-MM-DD */
   proximoSeguimiento: string | null;
+  /** Actuación de la línea de tiempo a la que se vincula (opcional). */
+  actuacionId: string | null;
 }
 
 export interface DatosConfidenciales {
@@ -499,6 +501,7 @@ export function crearFuenteDemo(rol: Rol): FuenteDatosLegajo {
         acuerdosDocentes: datos.acuerdosDocentes.trim(),
         archivoDriveUrl: datos.archivoDriveUrl,
         profesional: { nombre: usuario.nombre },
+        actuacion: null,
       });
       legajo.updatedAt = new Date().toISOString();
       auditar(datos.dni, "CARGAR_INTERVENCION");

@@ -4,7 +4,15 @@ import { Camera, KeyRound, Loader2, Pencil, RefreshCw, ShieldCheck, Trash2, User
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { solicitar } from "@/lib/dataSource";
 import { formatearFechaHora } from "@/lib/formato";
-import { ROL_ETIQUETA, ROLES, type Rol, type UsuarioAdministrado } from "@/lib/types";
+import {
+  CARGO_ETIQUETA,
+  CARGO_ROL,
+  CARGOS,
+  ROL_ETIQUETA,
+  etiquetaCargo,
+  type Cargo,
+  type UsuarioAdministrado,
+} from "@/lib/types";
 import Avatar, { reducirFoto, urlFotoUsuario } from "./Avatar";
 import { Insignia, MensajeError, Modal } from "./ui";
 
@@ -71,7 +79,7 @@ export default function UsuariosPanel({ usuarioActualId, onAviso, onError, onCam
             <tr>
               <th className="px-4 py-3 font-medium">Usuario</th>
               <th className="px-4 py-3 font-medium">DNI</th>
-              <th className="px-4 py-3 font-medium">Rol</th>
+              <th className="px-4 py-3 font-medium">Cargo</th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 font-medium">Alta</th>
               <th className="px-4 py-3" />
@@ -95,7 +103,10 @@ export default function UsuariosPanel({ usuarioActualId, onAviso, onError, onCam
                   </div>
                 </td>
                 <td className="px-4 py-3 tabular-nums text-slate-700">{u.dni ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-700">{ROL_ETIQUETA[u.rol]}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {etiquetaCargo(u.cargo, u.rol)}
+                  {u.cargo && <span className="block text-xs text-slate-500">{ROL_ETIQUETA[u.rol]}</span>}
+                </td>
                 <td className="px-4 py-3">
                   {u.activo ? <Insignia tono="verde">Activo</Insignia> : <Insignia tono="neutro">Inactivo</Insignia>}
                 </td>
@@ -152,7 +163,7 @@ function UsuarioModal({
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [dni, setDni] = useState("");
-  const [rol, setRol] = useState<Rol>("DOCENTE");
+  const [cargo, setCargo] = useState<Cargo | "">("DOCENTE");
   const [password, setPassword] = useState("");
   const [activo, setActivo] = useState(true);
   const [esAdministrador, setEsAdministrador] = useState(false);
@@ -167,7 +178,8 @@ function UsuarioModal({
     setNombre(existente?.nombre ?? "");
     setEmail(existente?.email ?? "");
     setDni(existente?.dni ?? "");
-    setRol(existente?.rol ?? "DOCENTE");
+    // Cuentas anteriores a los cargos: se muestran sin cargo y conservan su rol hasta que se elija uno.
+    setCargo(existente ? (existente.cargo ?? "") : "DOCENTE");
     setPassword("");
     setActivo(existente?.activo ?? true);
     setEsAdministrador(existente?.esAdministrador ?? false);
@@ -199,7 +211,7 @@ function UsuarioModal({
       nombre: nombre.trim(),
       email: email.trim(),
       dni: dni.trim() ? dni.trim() : null,
-      rol,
+      ...(cargo ? { rol: CARGO_ROL[cargo], cargo } : {}),
       esAdministrador,
     };
     if (password) cuerpo.password = password;
@@ -269,14 +281,18 @@ function UsuarioModal({
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="campo" required />
           </label>
           <label className="etiqueta-campo">
-            Rol
-            <select value={rol} onChange={(e) => setRol(e.target.value as Rol)} className="campo">
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROL_ETIQUETA[r]}
+            Cargo
+            <select value={cargo} onChange={(e) => setCargo(e.target.value as Cargo | "")} className="campo">
+              {cargo === "" && <option value="">Sin cargo asignado</option>}
+              {CARGOS.map((c) => (
+                <option key={c} value={c}>
+                  {CARGO_ETIQUETA[c]}
                 </option>
               ))}
             </select>
+            <span className="ayuda-campo">
+              Acceso: {cargo ? ROL_ETIQUETA[CARGO_ROL[cargo]] : existente ? ROL_ETIQUETA[existente.rol] : "—"}
+            </span>
           </label>
           <label className="etiqueta-campo">
             <span className="flex items-center gap-1">

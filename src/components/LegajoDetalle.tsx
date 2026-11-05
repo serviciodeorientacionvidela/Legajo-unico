@@ -686,9 +686,14 @@ export default function LegajoDetalle({
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                             <span className="tabular-nums">{formatearFecha(i.fecha)}</span>
                             <Insignia tono="violeta">{TIPO_INTERVENCION_ETIQUETA[i.tipo]}</Insignia>
-                            <span>{i.profesionalNombre}</span>
+                            <span>Intervino: {i.profesionalNombre}</span>
                             {i.participantes && <span>· Participantes: {i.participantes}</span>}
                           </div>
+                          {i.actuacion && (
+                            <p className="mt-1 text-xs font-medium text-institucional-800">
+                              Vinculada a la actuación del {formatearFecha(i.actuacion.fecha)}: {i.actuacion.motivo}
+                            </p>
+                          )}
                           <p className="mt-1 text-sm font-semibold text-slate-900">{i.motivo}</p>
                           <p className="mt-1 whitespace-pre-line text-sm text-slate-700">{i.informeConfidencial}</p>
                           {i.acuerdosDocentes && (

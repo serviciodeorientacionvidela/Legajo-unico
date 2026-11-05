@@ -60,6 +60,8 @@ enum TipoActuacion {
   ESCOLARIDAD_PROTEGIDA
   DEPORTISTA_FEDERADO
   INCLUSION_PPI
+  GENERO
+  ESCUELA_DOMICILIARIA
   OTRA
 }
 
@@ -144,6 +146,8 @@ enum TipoNotificacion {
   ALERTA_INASISTENCIAS
   LEGAJO_ABIERTO
   SITUACION_POR_VENCER
+  TICKET_ACTUALIZADO
+  MENSAJE_NUEVO
 }
 
 model Usuario {
@@ -153,6 +157,8 @@ model Usuario {
   nombre          String
   passwordHash    String
   rol             Rol
+  /// Cargo institucional (Director/a, Regente, Orientador/a social, Preceptor/a…). Lista en src/lib/types.ts.
+  cargo           String?
   activo          Boolean   @default(true)
   createdAt       DateTime  @default(now())
   dni             String?   @unique
@@ -169,6 +175,10 @@ model Usuario {
   actuaciones            Actuacion[]
   derivacionesEnviadas   Derivacion[]        @relation("DerivacionDerivadoPor")
   derivacionesAtendidas  Derivacion[]        @relation("DerivacionProfesionalSoe")
+  derivacionesRecibidas  Derivacion[]        @relation("DerivacionDestinatario")
+  conversacionesCreadas  Conversacion[]
+  participaciones        ParticipanteConversacion[]
+  mensajes               Mensaje[]
   seguimientosACargo     SeguimientoCaso[]
   situacionesRegistradas SituacionEspecial[]
   fichasCargadas         FichaAnexa[]
@@ -383,9 +393,13 @@ model IntervencionSoe {
   archivoDriveUrl     String?
   /// Fecha acordada para el próximo seguimiento (agenda del SOE).
   proximoSeguimiento  DateTime?
+  /// Actuación de la línea de tiempo del legajo a la que pertenece esta intervención (agrupa el caso).
+  actuacionId         String?
+  actuacion           Actuacion? @relation(fields: [actuacionId], references: [id], onDelete: SetNull)
 
   @@index([estudianteId, fecha])
   @@index([proximoSeguimiento])
+  @@index([actuacionId])
 }
 
 model AuditLog {
@@ -422,12 +436,15 @@ model Actuacion {
   motivo       String
   /// Hasta 3 líneas.
   resumen      String        @db.Text
+  /// Causa específica según el tipo (p. ej. "+15 inasistencias", "Bullying"). Lista en src/lib/types.ts.
+  causa        String?
 
   // --- Acta (si corresponde) ---
   /// Acta compromiso, citación con familia, acta de descargo, etc. (lista en src/lib/types.ts).
   tipoActa  String?
   actaLibro String?
   actaFolio String?
+  actaNumero String?
 
   // --- Efectos ---
   confidencial Boolean               @default(false)
@@ -442,6 +459,9 @@ model Actuacion {
 
   /// Situaciones que esta actuación marcó (p. ej. "Condicional por inasistencias").
   situaciones SituacionEspecial[]
+
+  /// Intervenciones del SOE vinculadas a esta actuación.
+  intervencionesSoe IntervencionSoe[]
 
   createdAt DateTime @default(now())
 
@@ -462,6 +482,8 @@ model PerfilSeguimiento {
  */
 model Derivacion {
   id           String     @id @default(cuid())
+  /// Número de ticket visible (#123) para quien deriva y quien recibe.
+  numero       Int        @unique @default(autoincrement())
   estudianteId String
   estudiante   Estudiante @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
 
@@ -470,6 +492,9 @@ model Derivacion {
   derivadoPorId String
   derivadoPor   Usuario  @relation("DerivacionDerivadoPor", fields: [derivadoPorId], references: [id])
   motivo        String   @db.Text
+  /// Usuario al que se deriva. Null: a todo el equipo SOE / dirección.
+  destinatarioId String?
+  destinatario   Usuario? @relation("DerivacionDestinatario", fields: [destinatarioId], references: [id])
 
   // --- B · La completa el SOE ---
   profesionalSoeId String?
@@ -495,6 +520,7 @@ model Derivacion {
 
   @@index([estado, fecha])
   @@index([estudianteId, fecha])
+  @@index([destinatarioId, estado])
 }
 
 /**
@@ -616,4 +642,44 @@ model Notificacion {
   createdAt       DateTime         @default(now())
 
   @@index([usuarioId, leida, createdAt])
+}
+
+// --- Mensajería interna ---
+
+/// Conversación directa (dos personas, sin nombre) o grupo (con nombre).
+model Conversacion {
+  id            String                     @id @default(cuid())
+  nombre        String?
+  esGrupo       Boolean                    @default(false)
+  creadaPorId   String
+  creadaPor     Usuario                    @relation(fields: [creadaPorId], references: [id])
+  participantes ParticipanteConversacion[]
+  mensajes      Mensaje[]
+  createdAt     DateTime                   @default(now())
+  /// Fecha del último mensaje, para ordenar la bandeja.
+  ultimoMensajeEl DateTime                 @default(now())
+}
+
+model ParticipanteConversacion {
+  conversacionId  String
+  conversacion    Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  usuarioId       String
+  usuario         Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  ultimaLecturaEl DateTime?
+  unidoEl         DateTime     @default(now())
+
+  @@id([conversacionId, usuarioId])
+  @@index([usuarioId])
+}
+
+model Mensaje {
+  id             String       @id @default(cuid())
+  conversacionId String
+  conversacion   Conversacion @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  autorId        String
+  autor          Usuario      @relation(fields: [autorId], references: [id])
+  texto          String       @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([conversacionId, createdAt])
 }

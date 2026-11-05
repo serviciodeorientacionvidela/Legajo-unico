@@ -23,6 +23,7 @@
  */
 
 import {
+  TIPOS_ACTUACION,
   TIPOS_INTERVENCION,
   type EstudianteFuente,
   type EstudianteResumen,
@@ -30,16 +31,18 @@ import {
   type LegajoFuente,
   type LegajoVisible,
   type Rol,
+  type TipoActuacion,
   type TipoIntervencion,
 } from "./types";
 
 export const PERMISOS = {
-  EDITAR_DATOS_BIOGRAFICOS: ["DIRECTIVO_SOE", "PRECEPTOR"],
+  // Preceptoría consulta el legajo pero no lo modifica: puede derivar y registrar actuaciones (circuito LUE).
+  EDITAR_DATOS_BIOGRAFICOS: ["DIRECTIVO_SOE"],
   VER_DATOS_CONTACTO: ["DIRECTIVO_SOE", "PRECEPTOR"],
   VER_TRAYECTORIA: ["DIRECTIVO_SOE", "PRECEPTOR"],
   EDITAR_CALIFICACIONES: ["DIRECTIVO_SOE"],
   VER_CONVIVENCIA: ["DIRECTIVO_SOE", "PRECEPTOR"],
-  CARGAR_INCIDENTE: ["DIRECTIVO_SOE", "PRECEPTOR"],
+  CARGAR_INCIDENTE: ["DIRECTIVO_SOE"],
   APROBAR_INCIDENTE: ["DIRECTIVO_SOE"],
   VER_DATOS_CONFIDENCIALES: ["DIRECTIVO_SOE"],
   EDITAR_DATOS_CONFIDENCIALES: ["DIRECTIVO_SOE"],
@@ -82,6 +85,10 @@ export function urlCarpetaDrive(folderId: string | null): string | null {
 
 export function normalizarTipoIntervencion(tipo: string): TipoIntervencion {
   return (TIPOS_INTERVENCION as readonly string[]).includes(tipo) ? (tipo as TipoIntervencion) : "OTRA";
+}
+
+export function normalizarTipoActuacion(tipo: string): TipoActuacion {
+  return (TIPOS_ACTUACION as readonly string[]).includes(tipo) ? (tipo as TipoActuacion) : "OTRA";
 }
 
 function iso(fecha: Fecha): string {
@@ -267,7 +274,16 @@ export function sanitizarLegajo(legajo: LegajoFuente, rol: Rol): LegajoVisible {
             acuerdosDocentes: i.acuerdosDocentes,
             archivoDriveUrl: i.archivoDriveUrl,
             profesionalNombre: i.profesional.nombre,
+            actuacion: i.actuacion ? { id: i.actuacion.id, fecha: iso(i.actuacion.fecha), motivo: i.actuacion.motivo } : null,
           })),
+          actuaciones: (legajo.actuaciones ?? [])
+            .filter((a) => !a.anuladaEl)
+            .map((a) => ({
+              id: a.id,
+              fecha: iso(a.fecha),
+              tipo: normalizarTipoActuacion(a.tipo),
+              motivo: a.motivo,
+            })),
         }
       : null,
     drive: {

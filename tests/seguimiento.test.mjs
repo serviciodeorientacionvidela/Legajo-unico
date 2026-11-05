@@ -67,11 +67,21 @@ test("Curso incluye turno; permisos de dirección son explícitos", () => {
 test("Actas completas, tres líneas y descargo para quita ICE", () => {
   const a = {
     tipo: "FAMILIA",
+    causa: "Otros",
     fecha: "2026-11-03",
     motivo: "Citación familiar",
     resumen: "Se acordó un seguimiento.",
   };
   assert.equal(actuacionSchema.safeParse(a).success, true);
+  // La causa tiene que corresponder al tipo de actuación.
+  assert.equal(actuacionSchema.safeParse({ ...a, causa: "Bullying" }).success, false);
+  assert.equal(actuacionSchema.safeParse({ ...a, causa: "" }).success, false);
+  // Libro de la lista, folio 1-200 y número de acta 1-500.
+  const acta = { ...a, tipoActa: "Acta", actaLibro: "SOE", actaFolio: "12", actaNumero: "40" };
+  assert.equal(actuacionSchema.safeParse(acta).success, true);
+  assert.equal(actuacionSchema.safeParse({ ...acta, actaLibro: "Libro alumno" }).success, false);
+  assert.equal(actuacionSchema.safeParse({ ...acta, actaFolio: "201" }).success, false);
+  assert.equal(actuacionSchema.safeParse({ ...acta, actaNumero: "501" }).success, false);
   assert.equal(
     actuacionSchema.safeParse({ ...a, resumen: "uno\ndos\ntres\ncuatro" })
       .success,
@@ -124,13 +134,13 @@ test('Servidor: apertura, actuación, seguimiento y auditoría se escriben junto
  prisma.$transaction=async(fn)=>fn(tx);
  try{
   const p={usuarioId:'u',funcion:'DIRECCION',cursos:[]};const u={id:'u',rol:'DIRECTIVO_SOE',nombre:'Prueba',email:'prueba@example.invalid'};
-  await escribirSeguimiento(e.dni,'ACTUACION',{tipo:'INASISTENCIAS',fecha:'2026-11-03',motivo:'Veinte inasistencias',resumen:'Se revisaron antecedentes y se citó a la familia.',motivoApertura:'INASISTENCIAS',seguimientoFecha:'2026-11-05',responsableId:'u',condicional:true},p,u,null);
+  await escribirSeguimiento(e.dni,'ACTUACION',{tipo:'INASISTENCIAS',causa:'+20 inasistencias',fecha:'2026-11-03',motivo:'Veinte inasistencias',resumen:'Se revisaron antecedentes y se citó a la familia.',motivoApertura:'INASISTENCIAS',seguimientoFecha:'2026-11-05',responsableId:'u',condicional:true},p,u,null);
   assert.deepEqual(escrituras.map(x=>x.tabla),['apertura','actuacion','situacion','seguimiento','auditoria']);
   assert.equal(escrituras[0].data.aperturaInasistencias,20);
   assert.equal(escrituras[0].data.aperturaPendientes,1);
   assert.equal(escrituras.at(-1).data.accion,'CARGAR_ACTUACION');
   escrituras.length=0;e.trayectoria[0].inasistencias=19;
-  await assert.rejects(()=>escribirSeguimiento(e.dni,'ACTUACION',{tipo:'INASISTENCIAS',fecha:'2026-11-03',motivo:'Diecinueve inasistencias',resumen:'No corresponde abrir por faltas.',motivoApertura:'INASISTENCIAS',seguimientoFecha:'2026-11-05',responsableId:'u'},p,u,null),/20/);
+  await assert.rejects(()=>escribirSeguimiento(e.dni,'ACTUACION',{tipo:'INASISTENCIAS',causa:'+20 inasistencias',fecha:'2026-11-03',motivo:'Diecinueve inasistencias',resumen:'No corresponde abrir por faltas.',motivoApertura:'INASISTENCIAS',seguimientoFecha:'2026-11-05',responsableId:'u'},p,u,null),/20/);
   assert.equal(escrituras.length,0);
  }finally{prisma.$transaction=original;}
 });

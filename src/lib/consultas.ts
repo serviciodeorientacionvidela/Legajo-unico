@@ -12,7 +12,16 @@ import type { FiltrosEstudiantes, MetricasInstitucionales, Rol } from "./types";
 export const INCLUDE_LEGAJO = {
   calificaciones: true,
   incidentes: { include: { autor: { select: { nombre: true } } } },
-  intervenciones: { include: { profesional: { select: { nombre: true } } } },
+  intervenciones: {
+    include: {
+      profesional: { select: { nombre: true } },
+      actuacion: { select: { id: true, fecha: true, motivo: true } },
+    },
+  },
+  actuaciones: {
+    select: { id: true, fecha: true, tipo: true, motivo: true, anuladaEl: true },
+    orderBy: { fecha: "desc" },
+  },
   trayectoria: true,
   alertas: true,
   faltasIce: true,

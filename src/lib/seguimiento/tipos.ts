@@ -40,13 +40,15 @@ export interface DatosSeguimiento {
     motivo: string;
     resumen: string;
     confidencial: boolean;
-    autor: { nombre: string; rol: string };
+    autor: { nombre: string; rol: string; cargo?: string | null };
     createdAt: string;
     anuladaEl: string | null;
     motivoAnulacion?: string | null;
+    causa?: string | null;
     tipoActa?: string | null;
     actaLibro?: string | null;
     actaFolio?: string | null;
+    actaNumero?: string | null;
   }[];
   derivaciones: {
     id: string;
@@ -56,6 +58,9 @@ export interface DatosSeguimiento {
     respuesta: string | null;
     accionesSoe?: string | null;
     derivadoPor: { nombre: string };
+    destinatario?: { id: string; nombre: string } | null;
+    /** La derivación está dirigida al usuario que consulta. */
+    paraMi?: boolean;
   }[];
   seguimientos: {
     id: string;
@@ -79,6 +84,17 @@ export interface DatosSeguimiento {
   }[];
   fichas: { tipo: string; updatedAt: string }[];
   responsables: { id: string; nombre: string }[];
+  /** Usuarios a los que se puede derivar. */
+  destinatarios?: { id: string; nombre: string; cargo: string | null }[];
+  /** Intervenciones del SOE (solo equipo). Sin el informe confidencial. */
+  intervencionesSoe?: {
+    id: string;
+    fecha: string;
+    tipo: string;
+    motivo: string;
+    actuacionId: string | null;
+    profesional: { nombre: string };
+  }[];
 }
 export interface DatosBandeja {
   perfil: string;

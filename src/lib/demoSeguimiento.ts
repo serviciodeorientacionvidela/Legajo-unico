@@ -227,7 +227,7 @@ const ACTUACIONES: Spec<ActuacionDemo, "id" | "dni" | "fecha" | "tipo" | "motivo
     id: "demo-act-49688745-2", dni: "49688745", fecha: "2025-11-18", tipo: "CONVIVENCIA_ICE", autor: "PRECEPTOR",
     motivo: "Pelea con un compañero · falta leve",
     resumen: "Se escucha a ambos y se registra el descargo. Se acuerda una reparación con el compañero.",
-    tipoActa: "Acta de descargo", actaLibro: "2", actaFolio: "77", puntosIce: 3,
+    tipoActa: "Acta", actaLibro: "2", actaFolio: "77", puntosIce: 3,
   },
   {
     id: "demo-act-49688745-3", dni: "49688745", fecha: "2026-03-14", tipo: "PROTOCOLO", autor: "SOE", confidencial: true,
@@ -251,7 +251,7 @@ const ACTUACIONES: Spec<ActuacionDemo, "id" | "dni" | "fecha" | "tipo" | "motivo
     id: "demo-act-49688745-6", dni: "49688745", fecha: "2026-10-22", tipo: "INASISTENCIAS", autor: "DIRECTIVO",
     motivo: "Condicional por inasistencias (21 faltas)",
     resumen: "Supervisión revisó los antecedentes y avaló la condicionalidad. Se ofreció escolaridad protegida.",
-    tipoActa: "Acta compromiso", actaLibro: "3", actaFolio: "58",
+    tipoActa: "Acta", actaLibro: "3", actaFolio: "58",
   },
   // --- SOSA ---
   {
@@ -265,14 +265,14 @@ const ACTUACIONES: Spec<ActuacionDemo, "id" | "dni" | "fecha" | "tipo" | "motivo
     id: "demo-act-49854116-0", dni: "49854116", fecha: "2026-03-15", tipo: "DEPORTISTA_FEDERADO", autor: "DIRECTIVO",
     motivo: "Escolaridad protegida por deporte federado",
     resumen: "La familia presenta la constancia de la federación. Dirección avala la escolaridad protegida hasta el 30/11.",
-    tipoActa: "Acta compromiso", actaLibro: "3", actaFolio: "9",
+    tipoActa: "Acta", actaLibro: "3", actaFolio: "9",
   },
   // --- CASTRO ---
   {
     id: "demo-act-50833561-0", dni: "50833561", fecha: "2026-08-10", tipo: "SALUD", autor: "DIRECTIVO",
     motivo: "Escolaridad protegida por salud",
     resumen: "La familia presenta certificado médico. Dirección avala la escolaridad protegida hasta el 10/11 con entrega semanal de actividades.",
-    tipoActa: "Acta compromiso", actaLibro: "3", actaFolio: "22",
+    tipoActa: "Acta", actaLibro: "3", actaFolio: "22",
   },
   // --- GONZÁLEZ ---
   {
@@ -292,7 +292,7 @@ const ACTUACIONES: Spec<ActuacionDemo, "id" | "dni" | "fecha" | "tipo" | "motivo
     id: "demo-act-51876245-0", dni: "51876245", fecha: "2026-05-14", tipo: "CONVIVENCIA_ICE", autor: "DIRECTIVO",
     motivo: "Agresión física a un compañero · falta grave",
     resumen: "Se cita a la familia y se firma un acta de acuerdo. Se deriva al SOE.",
-    tipoActa: "Acta de descargo", actaLibro: "2", actaFolio: "103", puntosIce: 10,
+    tipoActa: "Acta", actaLibro: "2", actaFolio: "103", puntosIce: 10,
     incidenteDemoId: "51876245-inc-0", derivacionId: "demo-der-51876245-0",
   },
   // --- PONCE ---
@@ -300,7 +300,7 @@ const ACTUACIONES: Spec<ActuacionDemo, "id" | "dni" | "fecha" | "tipo" | "motivo
     id: "demo-act-50912377-0", dni: "50912377", fecha: "2026-04-10", tipo: "CONVIVENCIA_ICE", autor: "DIRECTIVO",
     motivo: "Daño al mobiliario del laboratorio · falta grave",
     resumen: "Reconoce el hecho. La familia repone el material y se firma un acta de compromiso.",
-    tipoActa: "Acta compromiso", actaLibro: "2", actaFolio: "88", puntosIce: 8,
+    tipoActa: "Acta", actaLibro: "2", actaFolio: "88", puntosIce: 8,
     incidenteDemoId: "50912377-inc-0",
   },
   {
