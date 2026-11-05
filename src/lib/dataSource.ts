@@ -91,7 +91,8 @@ export interface FuenteDatosLegajo {
   obtenerLegajo(dni: string): Promise<LegajoVisible>;
   cargarIncidente(datos: NuevoIncidente): Promise<ResultadoIncidente>;
   resolverIncidente(incidenteId: string, accion: "APROBAR" | "ANULAR"): Promise<{ puntosConvivencia: number }>;
-  obtenerAuditoria(): Promise<RegistroAuditoriaVisible[]>;
+  /** desde / hasta: AAAA-MM-DD (opcionales). */
+  obtenerAuditoria(filtros?: { desde?: string; hasta?: string }): Promise<RegistroAuditoriaVisible[]>;
   importarGei(archivo: File): Promise<ResultadoImportacionGei>;
   cargarIntervencion(datos: NuevaIntervencion): Promise<{ intervencionId: string }>;
   editarConfidencial(dni: string, datos: DatosConfidenciales): Promise<LegajoVisible>;
@@ -156,8 +157,11 @@ export function crearFuenteApi(): FuenteDatosLegajo {
         body: JSON.stringify({ incidenteId, accion }),
       });
     },
-    async obtenerAuditoria() {
-      const { registros } = await solicitar<{ registros: RegistroAuditoriaVisible[] }>("/api/auditoria?limite=200");
+    async obtenerAuditoria(filtros) {
+      const params = new URLSearchParams({ limite: "1000" });
+      if (filtros?.desde) params.set("desde", filtros.desde);
+      if (filtros?.hasta) params.set("hasta", filtros.hasta);
+      const { registros } = await solicitar<{ registros: RegistroAuditoriaVisible[] }>(`/api/auditoria?${params}`);
       return registros;
     },
     importarGei(archivo) {

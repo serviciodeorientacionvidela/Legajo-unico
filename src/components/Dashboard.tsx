@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   Info,
+  KeyRound,
   Loader2,
   LogOut,
   MessageSquare,
@@ -43,6 +44,7 @@ import {
 } from "@/lib/types";
 import AuditoriaPanel from "./AuditoriaPanel";
 import AvisosIngreso from "./AvisosIngreso";
+import CambiarPasswordModal from "./CambiarPasswordModal";
 import MensajesPanel from "./MensajesPanel";
 import { NormativaPanel } from "./Protocolos";
 import TicketsPanel from "./TicketsPanel";
@@ -241,6 +243,8 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
     "estudiantes" | "informes" | "usuarios" | "seguimiento" | "tickets" | "mensajes" | "normativa"
   >("estudiantes");
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0);
+  const [modalPassword, setModalPassword] = useState(false);
+  const debeCambiarPassword = !modoDemo && !!usuarioReal?.debeCambiarPassword;
   const actualizarNoLeidos = useCallback(() => {
     if (modoDemo) return;
     solicitar<{ noLeidos: number }>("/api/mensajes?resumen=1")
@@ -344,7 +348,10 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
   );
 
   const cargarInforme = useCallback(() => fuente.obtenerInforme(), [fuente]);
-  const cargarAuditoria = useCallback(() => fuente.obtenerAuditoria(), [fuente]);
+  const cargarAuditoria = useCallback(
+    (filtros?: { desde?: string; hasta?: string }) => fuente.obtenerAuditoria(filtros),
+    [fuente],
+  );
 
   const importarGei = async (archivo: File) => {
     const resultado = await fuente.importarGei(archivo);
@@ -479,6 +486,11 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
           <BotonMenu activo={vista === "normativa"} onClick={() => setVista("normativa")} icono={<Scale className="h-4 w-4" aria-hidden />}>
             Normativa
           </BotonMenu>
+          {!modoDemo && (
+            <BotonMenu activo={false} onClick={() => setModalPassword(true)} icono={<KeyRound className="h-4 w-4" aria-hidden />}>
+              Cambiar contraseña
+            </BotonMenu>
+          )}
           {tienePermiso(rol, "GENERAR_INFORMES") && (
             <BotonMenu activo={vista === "informes"} onClick={() => setVista("informes")} icono={<ChartColumn className="h-4 w-4" aria-hidden />}>
               Informes
@@ -701,6 +713,16 @@ export default function Dashboard({ modoDemo }: { modoDemo: boolean }) {
         onGenerarInforme={() => setModalInforme(true)}
         onNuevaIntervencion={() => setModalIntervencion(true)}
         onEditarConfidencial={() => setModalConfidencial(true)}
+      />
+      <CambiarPasswordModal
+        abierto={modalPassword || debeCambiarPassword}
+        obligatorio={debeCambiarPassword}
+        onCerrar={() => setModalPassword(false)}
+        onCambiada={() => {
+          setModalPassword(false);
+          setVersionSesion((v) => v + 1);
+          setAviso({ texto: "Contraseña actualizada.", tono: "ok" });
+        }}
       />
       <IntervencionModal
         abierto={modalIntervencion}

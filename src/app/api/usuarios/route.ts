@@ -11,6 +11,7 @@ import {
   sincronizarPerfilCargo,
 } from "@/lib/usuarios";
 import { CARGO_ROL } from "@/lib/types";
+import { cifrarClaveTemporal } from "@/lib/claveTemporal";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,9 @@ export async function POST(req: Request) {
           cargo: datos.cargo ?? null,
           esAdministrador: datos.esAdministrador ?? false,
           passwordHash: await bcrypt.hash(datos.password, 12),
+          // La contraseña la eligió la cuenta técnica: queda como temporal hasta que la persona ponga la suya.
+          debeCambiarPassword: true,
+          passwordTemporalCifrada: cifrarClaveTemporal(datos.password),
           fotoPerfil: datos.foto ?? null,
           fotoActualizada: datos.foto ? new Date() : null,
         },

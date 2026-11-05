@@ -158,6 +158,11 @@ model Usuario {
   email           String    @unique
   nombre          String
   passwordHash    String
+  /// Contraseña generada por la cuenta técnica: obliga a cambiarla en el próximo ingreso.
+  debeCambiarPassword Boolean @default(false)
+  /// La contraseña temporal, cifrada (AES-GCM), para que la cuenta técnica pueda reenviarla.
+  /// Se borra cuando la persona elige la suya: las contraseñas propias no se guardan legibles.
+  passwordTemporalCifrada String?
   rol             Rol
   /// Cargo institucional (Director/a, Regente, Orientador/a social, Preceptor/a…). Lista en src/lib/types.ts.
   cargo           String?

@@ -29,6 +29,7 @@ export default function UsuariosPanel({ usuarioActualId, onAviso, onError, onCam
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [edicion, setEdicion] = useState<UsuarioAdministrado | "nuevo" | null>(null);
+  const [claveDe, setClaveDe] = useState<UsuarioAdministrado | null>(null);
 
   const actualizar = useCallback(async () => {
     setCargando(true);
@@ -111,7 +112,16 @@ export default function UsuariosPanel({ usuarioActualId, onAviso, onError, onCam
                   {u.activo ? <Insignia tono="verde">Activo</Insignia> : <Insignia tono="neutro">Inactivo</Insignia>}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{formatearFechaHora(u.createdAt)}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="space-x-1 whitespace-nowrap px-4 py-3 text-right">
+                  {u.id !== usuarioActualId && (
+                    <button
+                      type="button"
+                      onClick={() => setClaveDe(u)}
+                      className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200 hover:bg-amber-50"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" aria-hidden /> Contraseña
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setEdicion(u)}
@@ -133,6 +143,7 @@ export default function UsuariosPanel({ usuarioActualId, onAviso, onError, onCam
         </table>
       </div>
 
+      <ClaveModal usuario={claveDe} onCerrar={() => setClaveDe(null)} onError={onError} />
       <UsuarioModal
         edicion={edicion}
         esPropio={edicion !== null && edicion !== "nuevo" && edicion.id === usuarioActualId}
@@ -345,6 +356,100 @@ function UsuarioModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/** Cuenta técnica: ver la contraseña temporal (si la persona todavía no eligió la suya) o generar una nueva. */
+function ClaveModal({
+  usuario,
+  onCerrar,
+  onError,
+}: {
+  usuario: UsuarioAdministrado | null;
+  onCerrar: () => void;
+  onError: (error: unknown) => boolean;
+}) {
+  const [estado, setEstado] = useState<{ temporal: string | null; pendienteDeCambio: boolean } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    if (!usuario) return;
+    setEstado(null);
+    setError(null);
+    setCopiado(false);
+    solicitar<{ temporal: string | null; pendienteDeCambio: boolean }>(`/api/usuarios/${encodeURIComponent(usuario.id)}/clave`)
+      .then(setEstado)
+      .catch((e) => {
+        if (!onError(e)) setError((e as Error).message);
+      });
+  }, [usuario, onError]);
+
+  const generar = async () => {
+    if (!usuario) return;
+    setOcupado(true);
+    setError(null);
+    setCopiado(false);
+    try {
+      setEstado(
+        await solicitar<{ temporal: string; pendienteDeCambio: boolean }>(
+          `/api/usuarios/${encodeURIComponent(usuario.id)}/clave`,
+          { method: "POST", body: JSON.stringify({}) },
+        ),
+      );
+    } catch (e) {
+      if (!onError(e)) setError((e as Error).message);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const copiar = async (texto: string) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+    } catch {
+      setCopiado(false);
+    }
+  };
+
+  return (
+    <Modal abierto={usuario !== null} onCerrar={onCerrar} titulo="Contraseña" subtitulo={usuario ? `${usuario.nombre} · ${usuario.email}` : ""}>
+      <div className="space-y-4">
+        {!estado && !error && <Loader2 className="mx-auto h-5 w-5 animate-spin text-institucional-600" aria-label="Cargando" />}
+        {estado?.temporal && (
+          <div className="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">Contraseña temporal</p>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <code className="select-all rounded-lg bg-white px-3 py-1.5 font-mono text-lg text-slate-900 ring-1 ring-amber-200">{estado.temporal}</code>
+              <button type="button" className="boton-secundario" onClick={() => void copiar(estado.temporal!)}>
+                {copiado ? "Copiada" : "Copiar"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-amber-900">
+              Pásela por un canal privado. Al ingresar, el sistema le va a pedir que elija una propia y esta deja de verse.
+            </p>
+          </div>
+        )}
+        {estado && !estado.temporal && (
+          <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
+            Esta persona ya eligió su propia contraseña. Por seguridad no se guarda legible y no se puede ver. Si la olvidó,
+            genere una temporal nueva.
+          </p>
+        )}
+        {error && <MensajeError mensaje={error} />}
+        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+          <button type="button" onClick={onCerrar} className="boton-secundario">
+            Cerrar
+          </button>
+          <button type="button" disabled={ocupado} onClick={() => void generar()} className="boton-primario">
+            {ocupado ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}
+            Generar contraseña nueva
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

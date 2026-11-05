@@ -688,6 +688,8 @@ export interface UsuarioSesion {
   esAdministrador?: boolean;
   /** Marca de la última foto de perfil (para invalidar la imagen), o null si no tiene. */
   fotoVersion?: string | null;
+  /** Ingresó con una contraseña temporal: debe elegir una propia antes de seguir. */
+  debeCambiarPassword?: boolean;
 }
 
 /** Usuario del sistema tal como lo ve la cuenta administradora. */
@@ -708,7 +710,9 @@ export interface RegistroAuditoriaVisible {
   id: string;
   usuarioNombre: string;
   usuarioRol: Rol;
+  usuarioCargo?: string | null;
   estudianteDni: string | null;
+  estudianteNombre?: string | null;
   accion: AccionAuditoria;
   ipAddress: string | null;
   createdAt: string;

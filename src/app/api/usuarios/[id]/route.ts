@@ -10,6 +10,7 @@ import {
   sincronizarPerfilCargo,
 } from "@/lib/usuarios";
 import { CARGO_ROL } from "@/lib/types";
+import { cifrarClaveTemporal } from "@/lib/claveTemporal";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           activo: datos.activo,
           esAdministrador: datos.esAdministrador,
           passwordHash: datos.password ? await bcrypt.hash(datos.password, 12) : undefined,
+          // Contraseña puesta por la cuenta técnica a otra persona: temporal hasta que la cambie.
+          ...(datos.password && !propio
+            ? { debeCambiarPassword: true, passwordTemporalCifrada: cifrarClaveTemporal(datos.password) }
+            : datos.password
+              ? { debeCambiarPassword: false, passwordTemporalCifrada: null }
+              : {}),
           ...(datos.foto !== undefined && {
             fotoPerfil: datos.foto,
             fotoActualizada: datos.foto ? new Date() : null,

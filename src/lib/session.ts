@@ -58,7 +58,16 @@ export async function obtenerUsuarioSesion(): Promise<UsuarioSesion | null> {
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: datos.id },
-    select: { id: true, email: true, nombre: true, rol: true, activo: true, esAdministrador: true, fotoActualizada: true },
+    select: {
+      id: true,
+      email: true,
+      nombre: true,
+      rol: true,
+      activo: true,
+      esAdministrador: true,
+      fotoActualizada: true,
+      debeCambiarPassword: true,
+    },
   });
   if (!usuario || !usuario.activo) return null;
 
@@ -69,6 +78,7 @@ export async function obtenerUsuarioSesion(): Promise<UsuarioSesion | null> {
     rol: usuario.rol,
     esAdministrador: usuario.esAdministrador,
     fotoVersion: usuario.fotoActualizada?.toISOString() ?? null,
+    debeCambiarPassword: usuario.debeCambiarPassword,
   };
 }
 
