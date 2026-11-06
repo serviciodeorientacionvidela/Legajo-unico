@@ -31,7 +31,7 @@ interface ModalProps {
   subtitulo?: string;
   onCerrar: () => void;
   children: ReactNode;
-  ancho?: "md" | "lg" | "xl";
+  ancho?: "md" | "lg" | "xl" | "2xl";
 }
 
 export function Modal({ abierto, titulo, subtitulo, onCerrar, children, ancho = "md" }: ModalProps) {
@@ -47,17 +47,19 @@ export function Modal({ abierto, titulo, subtitulo, onCerrar, children, ancho = 
   }, [abierto, onCerrar]);
 
   if (!abierto) return null;
-  const anchos = { md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" };
+  const anchos = { md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl", "2xl": "max-w-6xl" };
 
+  // El diálogo nunca supera la altura de la ventana: la cabecera (con el botón Cerrar) queda fija y
+  // el contenido scrollea por dentro, así no se corta arriba cuando el contenido es largo.
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-institucional-950/50 p-4 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-institucional-950/50 p-4 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={idTitulo}
-        className={`relative w-full ${anchos[ancho]} overflow-hidden rounded-2xl bg-white shadow-2xl`}
+        className={`relative flex max-h-[calc(100dvh-2rem)] w-full ${anchos[ancho]} flex-col overflow-hidden rounded-2xl bg-white shadow-2xl`}
       >
-        <div className="flex items-start justify-between gap-4 bg-institucional-950 px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 bg-institucional-950 px-5 py-4">
           <div>
             <h2 id={idTitulo} className="text-base font-bold text-white">
               {titulo}
@@ -73,7 +75,7 @@ export function Modal({ abierto, titulo, subtitulo, onCerrar, children, ancho = 
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   );

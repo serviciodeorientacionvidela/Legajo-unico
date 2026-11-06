@@ -519,7 +519,7 @@ export default function InformeLegajoModal({ abierto, legajo, emisor, onCerrar, 
   );
 
   return (
-    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Generar informe del estudiante" subtitulo={`${e.apellidos}, ${e.nombres}`} ancho="xl">
+    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Generar informe del estudiante" subtitulo={`${e.apellidos}, ${e.nombres}`} ancho="2xl">
       <div className="grid gap-5 lg:grid-cols-[17rem_1fr]">
         <div className="space-y-4">
           <fieldset>
@@ -587,7 +587,7 @@ export default function InformeLegajoModal({ abierto, legajo, emisor, onCerrar, 
 
         <div className="min-w-0">
           <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Vista previa</p>
-          <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4">
+          <div className="overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4 lg:max-h-[calc(100dvh-11rem)]">
             <div className="rounded bg-white p-6 shadow-sm">{documento}</div>
           </div>
         </div>

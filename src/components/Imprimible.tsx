@@ -77,33 +77,39 @@ export function DocumentoInforme({
 }: DocumentoProps) {
   return (
     <article className="mx-auto max-w-[190mm] bg-white font-sans text-slate-900">
+      {/* Membrete: escudo + institución en una sola banda; los datos de emisión van debajo del título
+          para que el encabezado no se comprima cuando el documento se muestra angosto. */}
       <header className="flex items-center gap-4 border-b-4 border-institucional-600 pb-3">
         <img
           src="/logo-escuela.jpg"
           alt="Escudo Esc. N° 4-012 Ing. Ricardo Videla"
-          width={56}
-          height={56}
-          className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-institucional-400"
+          width={64}
+          height={64}
+          className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-institucional-400"
         />
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] uppercase tracking-wider text-slate-500">{INSTITUCION.dependencia}</p>
-          <p className="text-base font-bold text-institucional-950">{INSTITUCION.nombre}</p>
-          <p className="text-[11px] text-slate-500">{INSTITUCION.sistema}</p>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">{INSTITUCION.dependencia}</p>
+          <p className="mt-0.5 text-lg font-bold text-institucional-950">{INSTITUCION.nombre}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">{INSTITUCION.sistema}</p>
         </div>
-        <div className="text-right text-[11px] text-slate-500">
-          <p>Emitido el {formatearFechaHora(generado)}</p>
-          <p>por {generadoPor}</p>
-          {confidencial && (
-            <p className="mt-1 inline-block rounded border border-red-700 px-1.5 py-0.5 font-bold uppercase tracking-wide text-red-700">
-              Confidencial
-            </p>
-          )}
-        </div>
+        {confidencial && (
+          <p className="shrink-0 self-start rounded border-2 border-red-700 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-700">
+            Confidencial
+          </p>
+        )}
       </header>
 
-      <div className="mt-4">
-        <h1 className="text-xl font-bold text-institucional-950">{titulo}</h1>
-        {subtitulo && <p className="mt-0.5 text-sm text-slate-600">{subtitulo}</p>}
+      <div className="mt-5">
+        <h1 className="text-xl font-bold leading-tight text-institucional-950">{titulo}</h1>
+        {subtitulo && <p className="mt-1 text-sm text-slate-700">{subtitulo}</p>}
+        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 border-y border-slate-200 py-1.5 text-[11px] text-slate-600">
+          <span>
+            <span className="font-semibold text-slate-700">Emitido:</span> {formatearFechaHora(generado)}
+          </span>
+          <span>
+            <span className="font-semibold text-slate-700">Por:</span> {generadoPor}
+          </span>
+        </p>
       </div>
 
       <div className="mt-4 space-y-5">{children}</div>
