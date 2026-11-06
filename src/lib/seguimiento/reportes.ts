@@ -126,8 +126,10 @@ export async function generarReporte(
       continue;
     }
     const faltas = inasistenciasAnuales(e, ciclo);
-    if (n === 4 && (faltas === null || faltas < 20)) continue;
     for (const s of e.situaciones) {
+      // La condicionalidad por ICE no depende de las faltas: el umbral de 20 solo filtra las de inasistencias.
+      if (n === 4 && s.tipo !== "CONDICIONAL_ICE" && (faltas === null || faltas < 20))
+        continue;
       if (
         s.fechaInicio.getUTCFullYear() > ciclo ||
         (s.fechaFin && s.fechaFin.getUTCFullYear() < ciclo)
