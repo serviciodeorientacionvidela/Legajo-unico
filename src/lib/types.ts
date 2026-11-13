@@ -193,7 +193,8 @@ export const LIBROS_ACTA = [
   "Abanderados y escoltas",
 ] as const;
 export const FOLIO_MAX = 200;
-export const NUMERO_ACTA_MAX = 500;
+/** Los libros del SOE ya pasan el acta 600 en un ciclo. */
+export const NUMERO_ACTA_MAX = 999;
 
 /** Valores de Actuacion.tipoActa (texto libre en la base para poder sumar tipos sin migrar). */
 export const TIPOS_ACTA = [

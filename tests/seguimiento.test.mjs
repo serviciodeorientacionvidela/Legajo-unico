@@ -76,12 +76,13 @@ test("Actas completas, tres líneas y descargo para quita ICE", () => {
   // La causa tiene que corresponder al tipo de actuación.
   assert.equal(actuacionSchema.safeParse({ ...a, causa: "Bullying" }).success, false);
   assert.equal(actuacionSchema.safeParse({ ...a, causa: "" }).success, false);
-  // Libro de la lista, folio 1-200 y número de acta 1-500.
+  // Libro de la lista, folio 1-200 y número de acta 1-999.
   const acta = { ...a, tipoActa: "Acta", actaLibro: "SOE", actaFolio: "12", actaNumero: "40" };
   assert.equal(actuacionSchema.safeParse(acta).success, true);
   assert.equal(actuacionSchema.safeParse({ ...acta, actaLibro: "Libro alumno" }).success, false);
   assert.equal(actuacionSchema.safeParse({ ...acta, actaFolio: "201" }).success, false);
-  assert.equal(actuacionSchema.safeParse({ ...acta, actaNumero: "501" }).success, false);
+  assert.equal(actuacionSchema.safeParse({ ...acta, actaNumero: "627" }).success, true);
+  assert.equal(actuacionSchema.safeParse({ ...acta, actaNumero: "1000" }).success, false);
   assert.equal(
     actuacionSchema.safeParse({ ...a, resumen: "uno\ndos\ntres\ncuatro" })
       .success,

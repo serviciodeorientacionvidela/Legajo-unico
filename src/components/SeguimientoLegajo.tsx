@@ -1170,8 +1170,9 @@ export default function SeguimientoLegajo({
                             )}
                             {"tipoActa" in a && a.tipoActa && (
                               <p className="mt-1 text-xs text-slate-500">
-                                {a.tipoActa} · Libro {a.actaLibro} · Folio{" "}
-                                {a.actaFolio}
+                                {a.tipoActa}
+                                {a.actaLibro ? ` · Libro ${a.actaLibro}` : ""}
+                                {a.actaFolio ? ` · Folio ${a.actaFolio}` : ""}
                                 {a.actaNumero ? ` · Acta N.º ${a.actaNumero}` : ""}
                               </p>
                             )}
@@ -1427,7 +1428,10 @@ export default function SeguimientoLegajo({
                 <p>{a.resumen}</p>
                 {"tipoActa" in a && a.tipoActa && (
                   <p>
-                    {a.tipoActa} · Libro {a.actaLibro} · Folio {a.actaFolio}
+                    {a.tipoActa}
+                    {a.actaLibro ? ` · Libro ${a.actaLibro}` : ""}
+                    {a.actaFolio ? ` · Folio ${a.actaFolio}` : ""}
+                    {a.actaNumero ? ` · Acta N.º ${a.actaNumero}` : ""}
                   </p>
                 )}
                 <p className="text-xs">Registró: {a.autor.nombre}</p>
